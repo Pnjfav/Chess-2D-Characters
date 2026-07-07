@@ -1,0 +1,3894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Trainer</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+:root { --sq: 60px; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #2d2d2d;
+    color: #ddd;
+    font-family: "Segoe UI", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+#app {
+    text-align: center;
+    width: 100%;
+    max-width: 560px;
+    padding: 44px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+h1 { font-size: clamp(22px, calc(var(--sq) * 0.467), 40px); margin-bottom: 20px; color: #eee; }
+h2 { font-size: clamp(18px, calc(var(--sq) * 0.367), 32px); margin-bottom: 15px; color: #ddd; }
+.btn {
+    display: block;
+    width: min(280px, calc(100% - 20px));
+    margin: 10px auto;
+    padding: 12px 0;
+    background: #444;
+    border: none;
+    border-radius: 6px;
+    color: #ddd;
+    font-size: clamp(14px, calc(var(--sq) * 0.3), 24px);
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: inherit;
+    min-height: 44px;
+}
+.btn:hover { background: #5a5a5a; }
+.btn-small {
+    width: auto;
+    display: inline-block;
+    padding: 8px 20px;
+    font-size: clamp(12px, calc(var(--sq) * 0.25), 20px);
+    margin: 5px;
+    min-height: 44px;
+}
+.btn-menu { width: min(300px, calc(100% - 20px)); padding: 14px 0; font-size: clamp(16px, calc(var(--sq) * 0.333), 28px); }
+#board-wrap {
+    display: inline-block;
+    position: relative;
+    margin: 10px auto;
+}
+#board {
+    display: grid;
+    grid-template-columns: calc(var(--sq) * 0.4) repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr) calc(var(--sq) * 0.4);
+    width: calc(var(--sq) * 8 + var(--sq) * 0.4);
+    height: calc(var(--sq) * 8 + var(--sq) * 0.4);
+    user-select: none;
+}
+.sq {
+    width: var(--sq);
+    height: var(--sq);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(26px, calc(var(--sq) * 0.667), 60px);
+    cursor: pointer;
+    font-family: "Segoe UI Symbol", "DejaVu Sans", "Arial Unicode MS", sans-serif;
+    transition: box-shadow 0.1s;
+    position: relative;
+}
+.sq.vm::after {
+    content: '';
+    display: block;
+    width: calc(var(--sq) * 0.25);
+    height: calc(var(--sq) * 0.25);
+    border-radius: 50%;
+    background: rgba(0,128,0,0.6);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+.sq.vm-capture {
+    box-shadow: inset 0 0 0 2px rgba(255,0,0,0.5);
+}
+.sq.wp { text-shadow: 0 0 1px #000, 0 0 1px #000, 1px 1px 2px rgba(0,0,0,0.5); }
+.sq.light { background: #f0d9b5; }
+.sq.dark { background: #b58863; }
+.sq.sel { box-shadow: inset 0 0 0 3px #ff0; }
+.sq:hover { filter: brightness(1.1); }
+.label-r, .label-f {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(10px, calc(var(--sq) * 0.217), 16px);
+    color: #999;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+.label-r { width: calc(var(--sq) * 0.4); height: var(--sq); }
+.label-f { width: var(--sq); height: calc(var(--sq) * 0.4); }
+#status {
+    margin-top: 12px;
+    font-size: clamp(13px, calc(var(--sq) * 0.283), 22px);
+    color: #ccc;
+    min-height: 24px;
+}
+.lesson-item {
+    padding: 6px 12px;
+    margin: 2px 0;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: clamp(12px, calc(var(--sq) * 0.25), 20px);
+    text-align: left;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+.lesson-item:hover { background: #444; }
+.diff-header {
+    font-size: clamp(11px, calc(var(--sq) * 0.233), 18px);
+    color: #999;
+    margin-top: 8px;
+    margin-bottom: 2px;
+    text-align: left;
+    padding-left: 8px;
+    font-style: italic;
+}
+#lesson-info {
+    margin-top: 12px;
+    font-size: clamp(13px, calc(var(--sq) * 0.267), 22px);
+    color: #ccc;
+    line-height: 1.5;
+}
+#lesson-comment {
+    margin-top: 6px;
+    font-size: clamp(12px, calc(var(--sq) * 0.25), 20px);
+    color: #aaa;
+    min-height: 20px;
+    max-width: min(500px, calc(100% - 20px));
+    margin-left: auto;
+    margin-right: auto;
+}
+#lesson-list-wrap {
+    max-height: clamp(200px, calc(var(--sq) * 6.667), 400px);
+    overflow-y: auto;
+    width: min(480px, calc(100% - 20px));
+    margin: 0 auto;
+    text-align: left;
+}
+.hidden { display: none; }
+.back { margin-top: 20px; }
+.zoom-ctrl {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(40,40,40,0.9);
+    padding: 6px 12px;
+    border-radius: 6px;
+    z-index: 999;
+    user-select: none;
+}
+.zoom-ctrl input { width: 80px; cursor: pointer; }
+.zoom-ctrl label, .zoom-ctrl span {
+    color: #aaa;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+.zoom-ctrl label:first-child { font-size: 11px; }
+.zoom-ctrl label:last-child { font-size: 16px; }
+.zoom-ctrl span {
+    font-size: 13px;
+    min-width: 36px;
+    text-align: right;
+}
+</style>
+</head>
+<body>
+<div class="zoom-ctrl">
+    <label>A</label>
+    <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.1" value="1">
+    <label>A</label>
+    <span id="zoom-label">100%</span>
+</div>
+<div id="app">
+    <div id="screen-menu">
+        <h1>CHESS TRAINER</h1>
+        <button class="btn btn-menu" onclick="StartLocalMP()">Local MP</button>
+        <button class="btn btn-menu" onclick="ShowAISetup()">Play vs AI</button>
+        <button class="btn btn-menu" onclick="ShowCategory()">Teaching Lessons</button>
+        <button class="btn btn-menu" onclick="ShowMultiplayer()">Multiplayer</button>
+        <button class="btn btn-menu" onclick="ShowTournamentSetup()">Tournament</button>
+        <button class="btn btn-menu" onclick="QuitApp()">Quit</button>
+    </div>
+
+    <div id="screen-ai-setup" class="hidden">
+        <h2>Play vs AI</h2>
+        <div style="margin:10px 0;text-align:center">
+            <div style="font-size:14px;color:#ccc;margin-bottom:4px">You play as</div>
+            <div>
+                <button id="ai-side-w" class="btn btn-small" onclick="SetAISide(true)" style="background:#5a5a5a;font-weight:bold">White</button>
+                <button id="ai-side-b" class="btn btn-small" onclick="SetAISide(false)">Black</button>
+            </div>
+        </div>
+        <div style="margin:8px 0;text-align:center">
+            <div style="font-size:14px;color:#ccc;margin-bottom:4px">Strength</div>
+            <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;max-width:500px;margin:0 auto">
+                <button id="ai-str-0" class="btn btn-small" onclick="SetStrength(0)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Novice</button>
+                <button id="ai-str-1" class="btn btn-small" onclick="SetStrength(1)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Intermediate</button>
+                <button id="ai-str-2" class="btn btn-small" onclick="SetStrength(2)" style="background:#5a5a5a;font-weight:bold;font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Competitor</button>
+                <button id="ai-str-3" class="btn btn-small" onclick="SetStrength(3)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Master</button>
+                <button id="ai-str-4" class="btn btn-small" onclick="SetStrength(4)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Grandmaster</button>
+                <button id="ai-str-5" class="btn btn-small" onclick="SetStrength(5)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px;color:#ffd700">Random</button>
+            </div>
+        </div>
+        <div style="margin:8px 0;text-align:center">
+            <div style="font-size:14px;color:#ccc;margin-bottom:4px">Persona</div>
+            <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;max-width:500px;margin:0 auto">
+                <button id="ai-per-0" class="btn btn-small" onclick="SetPersona(0)" style="background:#5a5a5a;font-weight:bold;font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Novice</button>
+                <button id="ai-per-1" class="btn btn-small" onclick="SetPersona(1)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Defender</button>
+                <button id="ai-per-2" class="btn btn-small" onclick="SetPersona(2)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Conservative</button>
+                <button id="ai-per-3" class="btn btn-small" onclick="SetPersona(3)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Flanker</button>
+                <button id="ai-per-4" class="btn btn-small" onclick="SetPersona(4)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Reckless</button>
+                <button id="ai-per-5" class="btn btn-small" onclick="SetPersona(5)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Attacker</button>
+            </div>
+        </div>
+        <div style="margin:8px 0;text-align:center">
+            <div style="font-size:14px;color:#ccc;margin-bottom:4px">Modifier</div>
+            <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;max-width:500px;margin:0 auto">
+                <button id="ai-mod-0" class="btn btn-small" onclick="SetModifier(0)" style="background:#5a5a5a;font-weight:bold;font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Static</button>
+                <button id="ai-mod-1" class="btn btn-small" onclick="SetModifier(1)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Fluid</button>
+                <button id="ai-mod-2" class="btn btn-small" onclick="SetModifier(2)" style="font-size:clamp(9px,calc(var(--sq)*0.18),13px);padding:5px 8px">Fluent</button>
+            </div>
+            <div id="ai-diff-desc" style="font-size:12px;color:#999;margin-top:4px;min-height:16px"></div>
+        </div>
+        <button class="btn btn-menu" onclick="StartAIGame()">Start Game</button>
+        <button class="btn btn-small back" onclick="BackToMenu()">Back</button>
+    </div>
+
+    <div id="screen-play" class="hidden">
+        <h2 id="screen-play-title">Local MP</h2>
+        <div id="board-wrap"></div>
+        <div id="status">White's turn</div>
+        <div id="clock-display" style="font-size:clamp(11px,calc(var(--sq)*0.2),16px);color:#aaa;margin:2px auto"></div>
+        <div id="history-wrap" style="width:min(400px,calc(100%-20px));margin:8px auto;text-align:left;font-size:clamp(11px,calc(var(--sq)*0.233),18px);color:#aaa;max-height:80px;overflow-y:auto;font-family:monospace"></div>
+        <div>
+            <button class="btn btn-small" onclick="UndoLastMove()">Undo (<u>U</u>)</button>
+            <button class="btn btn-small" onclick="ExportPGNFromUI()">PGN (<u>P</u>)</button>
+            <button class="btn btn-small" onclick="BackToMenu()">Back to Menu</button>
+        </div>
+    </div>
+
+    <div id="screen-tournament-setup" class="hidden">
+        <h2>Tournament</h2>
+        <div style="margin:12px auto;text-align:center">
+            <div style="font-size:15px;color:#ccc;margin-bottom:8px">Number of players</div>
+            <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:400px;margin:0 auto">
+                <button class="btn btn-small" onclick="SetTournSize(8)" style="font-size:13px;padding:6px 12px">8</button>
+                <button class="btn btn-small" onclick="SetTournSize(16)" style="background:#5a5a5a;font-weight:bold;font-size:13px;padding:6px 12px">16</button>
+                <button class="btn btn-small" onclick="SetTournSize(32)" style="font-size:13px;padding:6px 12px">32</button>
+                <button class="btn btn-small" onclick="SetTournSize(64)" style="font-size:13px;padding:6px 12px">64</button>
+                <button class="btn btn-small" onclick="SetTournSize(128)" style="font-size:13px;padding:6px 12px">128</button>
+            </div>
+            <div style="margin-top:14px">
+                <button class="btn btn-menu" onclick="StartTournament()">Generate &amp; Start</button>
+            </div>
+            <div style="margin-top:8px">
+                <button class="btn btn-small" onclick="LoadTournament(); ShowTournamentBracket();" style="background:#5a5a5a">Resume Saved</button>
+            </div>
+        </div>
+        <button class="btn btn-small back" onclick="BackToMenu()">Back</button>
+    </div>
+
+    <div id="screen-tournament-bracket" class="hidden">
+        <h2 id="tourn-title">Tournament Bracket</h2>
+        <div id="tourn-info" style="font-size:13px;color:#999;margin:4px auto;text-align:center"></div>
+        <div id="tourn-bracket-wrap" style="overflow-x:auto;overflow-y:auto;max-height:60vh;width:100%;margin:4px auto"></div>
+        <div style="margin:6px auto;text-align:center">
+            <button id="tourn-play-btn" class="btn btn-menu" onclick="PlayNextTournamentMatch()" style="display:none">Play Next Match</button>
+            <button class="btn btn-small" onclick="ShowTournamentResults()" style="display:none" id="tourn-results-btn">View Results</button>
+            <button class="btn btn-small" onclick="ShowTournamentSetup()">Back</button>
+            <button class="btn btn-small" onclick="ClearTournamentSave(); tournamentActive = false; BackToMenu()">Exit Tournament</button>
+        </div>
+    </div>
+
+    <div id="screen-tournament-results" class="hidden">
+        <h2>Tournament Results</h2>
+        <div id="tourn-results-wrap" style="overflow-x:auto;max-height:65vh;width:100%;margin:4px auto"></div>
+        <button class="btn btn-small back" onclick="ShowTournamentBracket()">Bracket</button>
+        <button class="btn btn-small" onclick="ShowTournamentSetup()">New Tournament</button>
+    </div>
+
+    <div id="screen-category" class="hidden">
+        <h2>Select Category</h2>
+        <button class="btn" onclick="ShowLessonList('White')">White Openings</button>
+        <button class="btn" onclick="ShowLessonList('Black')">Black Defenses</button>
+        <button class="btn" onclick="ShowFamilyList()">By Opening Family</button>
+        <button class="btn" onclick="ShowLessonList('')">All Lessons</button>
+        <button class="btn btn-small back" onclick="BackToMenu()">Back</button>
+    </div>
+
+    <div id="screen-family" class="hidden">
+        <h2>Opening Families</h2>
+        <div id="family-list-wrap"></div>
+        <button class="btn btn-small back" onclick="ShowCategory()">Back</button>
+    </div>
+
+    <div id="screen-lessonlist" class="hidden">
+        <div id="lesson-list-header"></div>
+        <div id="lesson-list-wrap"></div>
+        <button class="btn btn-small back" onclick="LessonListBack()">Back</button>
+    </div>
+
+    <div id="screen-lesson" class="hidden">
+        <h2 id="lesson-name"></h2>
+        <div id="board-wrap-lesson"></div>
+        <div id="lesson-info"></div>
+        <div id="lesson-comment"></div>
+        <div id="lesson-buttons"></div>
+        <button class="btn btn-small back" onclick="ExitLesson()">Exit</button>
+    </div>
+
+    <div id="screen-multiplayer" class="hidden">
+        <h2>Multiplayer</h2>
+        <button class="btn btn-menu" onclick="HostGame()">Host Game</button>
+        <button class="btn btn-menu" onclick="ShowJoinGame()">Join Game</button>
+        <button class="btn btn-small back" onclick="BackToMenu()">Back</button>
+    </div>
+
+    <div id="screen-host" class="hidden">
+        <h2>Host Game</h2>
+        <div id="host-status" style="margin:20px 0;font-size:clamp(14px,calc(var(--sq)*0.3),22px);color:#ccc"></div>
+        <div id="room-code-wrap" style="display:none">
+            <p style="color:#aaa">Share this code with your opponent:</p>
+            <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0">
+                <div id="code-display" style="font-size:clamp(28px,calc(var(--sq)*0.6),48px);font-weight:bold;letter-spacing:6px;color:#ffd700;background:#333;padding:12px 20px;border-radius:8px;font-family:monospace"></div>
+                <button onclick="CopyRoomCode()" style="padding:12px 18px;font-size:clamp(14px,calc(var(--sq)*0.283),22px);background:#555;border:none;border-radius:6px;color:#ddd;cursor:pointer;min-height:44px">Copy</button>
+            </div>
+        </div>
+        <button class="btn btn-small back" onclick="CancelHost()">Cancel</button>
+    </div>
+
+    <div id="screen-join" class="hidden">
+        <h2>Join Game</h2>
+        <div style="margin:16px auto;width:min(300px,calc(100%-40px))">
+            <input type="text" id="join-code-input" placeholder="Enter host code" style="width:100%;padding:12px;font-size:clamp(16px,calc(var(--sq)*0.333),28px);text-align:center;background:#444;border:none;border-radius:6px;color:#ddd;font-family:monospace;letter-spacing:3px;text-transform:uppercase">
+        </div>
+        <button class="btn btn-small" onclick="JoinGame()">Connect</button>
+        <div id="join-status" style="margin:12px 0;font-size:clamp(13px,calc(var(--sq)*0.267),20px);color:#ccc"></div>
+        <button class="btn btn-small back" onclick="CancelJoin()">Back</button>
+    </div>
+</div>
+
+<script>
+// ============ PIECE HELPERS ============
+function GetPieceChar(p) {
+    switch (p) {
+        case 'K': return '\u2654'; case 'Q': return '\u2655';
+        case 'R': return '\u2656'; case 'B': return '\u2657';
+        case 'N': return '\u2658'; case 'P': return '\u2659';
+        case 'k': return '\u265A'; case 'q': return '\u265B';
+        case 'r': return '\u265C'; case 'b': return '\u265D';
+        case 'n': return '\u265E'; case 'p': return '\u265F';
+        default: return '';
+    }
+}
+function IsWhitePiece(p) { return p >= 'A' && p <= 'Z'; }
+function IsBlackPiece(p) { return p >= 'a' && p <= 'z'; }
+
+// ============ BOARD STATE ============
+let board = [];
+let whiteTurn = true;
+let kingMoved = [false, false];
+let rookMoved = [[false, false], [false, false]];
+let enPassantRow = -1;
+let enPassantCol = -1;
+let boardHistory = [];
+let moveHistory = [];
+
+function InitializeBoard() {
+    board = [
+        ['r','n','b','q','k','b','n','r'],
+        ['p','p','p','p','p','p','p','p'],
+        ['.','.','.','.','.','.','.','.'],
+        ['.','.','.','.','.','.','.','.'],
+        ['.','.','.','.','.','.','.','.'],
+        ['.','.','.','.','.','.','.','.'],
+        ['P','P','P','P','P','P','P','P'],
+        ['R','N','B','Q','K','B','N','R']
+    ];
+    kingMoved = [false, false];
+    rookMoved = [[false, false], [false, false]];
+    whiteTurn = true;
+    enPassantRow = enPassantCol = -1;
+    moveHistory = [];
+    boardHistory = [];
+}
+
+// ============ MOVE VALIDATION ============
+function IsOnBoard(r, c) { return r >= 0 && r <= 7 && c >= 0 && c <= 7; }
+
+function ConvertMove(sq) {
+    if (sq.length !== 2) return null;
+    let c = sq.charCodeAt(0) - 97;
+    let r = 8 - (sq.charCodeAt(1) - 48);
+    if (r < 0 || r > 7 || c < 0 || c > 7) return null;
+    return { r: r, c: c };
+}
+
+function IsValidMove(fr, fc, tr, tc, piece) {
+    let dr = tr - fr;
+    let dc = tc - fc;
+    let adr = Math.abs(dr);
+    let adc = Math.abs(dc);
+    let p = piece.toLowerCase();
+
+    if (p === 'p') {
+        let dir = IsWhitePiece(piece) ? -1 : 1;
+        let startRow = IsWhitePiece(piece) ? 6 : 1;
+        if (dc === 0 && dr === dir && board[tr][tc] === '.') return true;
+        if (dc === 0 && dr === 2 * dir && fr === startRow && board[tr][tc] === '.') {
+            if (board[fr + dir][fc] === '.') return true;
+        }
+        if (adc === 1 && dr === dir && (board[tr][tc] !== '.' || (tr === enPassantRow && tc === enPassantCol))) return true;
+        return false;
+    }
+
+    if (p === 'n') return (adr === 2 && adc === 1) || (adr === 1 && adc === 2);
+
+    if (p === 'b') {
+        if (adr !== adc || dr === 0) return false;
+        let stepR = dr > 0 ? 1 : -1;
+        let stepC = dc > 0 ? 1 : -1;
+        let r = fr + stepR, c = fc + stepC;
+        while (r !== tr) {
+            if (board[r][c] !== '.') return false;
+            r += stepR; c += stepC;
+        }
+        return true;
+    }
+
+    if (p === 'r') {
+        if (dr !== 0 && dc !== 0) return false;
+        let stepR = dr !== 0 ? (dr > 0 ? 1 : -1) : 0;
+        let stepC = dc !== 0 ? (dc > 0 ? 1 : -1) : 0;
+        let r = fr + stepR, c = fc + stepC;
+        while (r !== tr || c !== tc) {
+            if (board[r][c] !== '.') return false;
+            r += stepR; c += stepC;
+        }
+        return true;
+    }
+
+    if (p === 'q') {
+        if (dr === 0 || dc === 0) {
+            let stepR = dr !== 0 ? (dr > 0 ? 1 : -1) : 0;
+            let stepC = dc !== 0 ? (dc > 0 ? 1 : -1) : 0;
+            let r = fr + stepR, c = fc + stepC;
+            while (r !== tr || c !== tc) {
+                if (board[r][c] !== '.') return false;
+                r += stepR; c += stepC;
+            }
+            return true;
+        }
+        if (adr === adc) {
+            let stepR = dr > 0 ? 1 : -1;
+            let stepC = dc > 0 ? 1 : -1;
+            let r = fr + stepR, c = fc + stepC;
+            while (r !== tr) {
+                if (board[r][c] !== '.') return false;
+                r += stepR; c += stepC;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    if (p === 'k') {
+        if (adr <= 1 && adc <= 1) return true;
+        if (adr === 0 && adc === 2) {
+            let colorIdx = IsWhitePiece(piece) ? 0 : 1;
+            let row = fr;
+            if (kingMoved[colorIdx]) return false;
+            if (dc === 2) {
+                if (rookMoved[colorIdx][1]) return false;
+                if (board[row][5] !== '.' || board[row][6] !== '.') return false;
+                return true;
+            }
+            if (dc === -2) {
+                if (rookMoved[colorIdx][0]) return false;
+                if (board[row][1] !== '.' || board[row][2] !== '.' || board[row][3] !== '.') return false;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    return false;
+}
+
+// ============ MOVE EXECUTION ============
+function MovePiece(from, to) {
+    let src = ConvertMove(from);
+    let dst = ConvertMove(to);
+    if (!src || !dst) return false;
+
+    let fr = src.r, fc = src.c;
+    let tr = dst.r, tc = dst.c;
+    let piece = board[fr][fc];
+
+    if (piece === '.') return false;
+    if (whiteTurn && !IsWhitePiece(piece)) return false;
+    if (!whiteTurn && !IsBlackPiece(piece)) return false;
+
+    let destPiece = board[tr][tc];
+    if (whiteTurn && IsWhitePiece(destPiece)) return false;
+    if (!whiteTurn && IsBlackPiece(destPiece)) return false;
+
+    if (!IsValidMove(fr, fc, tr, tc, piece)) return false;
+
+    PushBoardState();
+
+    let algebraic = ToAlgebraic(from, to);
+
+    let epCapture = (piece.toLowerCase() === 'p' && tc !== fc && board[tr][tc] === '.');
+
+    board[tr][tc] = piece;
+    board[fr][fc] = '.';
+
+    if (epCapture) {
+        board[fr][tc] = '.';
+    }
+
+    // En passant tracking
+    enPassantRow = enPassantCol = -1;
+    if (piece.toLowerCase() === 'p' && Math.abs(tr - fr) === 2) {
+        enPassantRow = Math.floor((fr + tr) / 2);
+        enPassantCol = fc;
+    }
+
+    // Auto-promotion
+    if (piece === 'P' && tr === 0) board[tr][tc] = 'Q';
+    else if (piece === 'p' && tr === 7) board[tr][tc] = 'q';
+
+    // Castling
+    let colorIdx = whiteTurn ? 0 : 1;
+    if (piece === 'K' || piece === 'k') {
+        kingMoved[colorIdx] = true;
+        if (tc - fc === 2) {
+            board[fr][fc + 1] = board[fr][7];
+            board[fr][7] = '.';
+            rookMoved[colorIdx][1] = true;
+        } else if (tc - fc === -2) {
+            board[fr][fc - 1] = board[fr][0];
+            board[fr][0] = '.';
+            rookMoved[colorIdx][0] = true;
+        }
+    }
+
+    // Rook moved tracking
+    if (fr === 7 && fc === 0) rookMoved[0][0] = true;
+    if (fr === 7 && fc === 7) rookMoved[0][1] = true;
+    if (fr === 0 && fc === 0) rookMoved[1][0] = true;
+    if (fr === 0 && fc === 7) rookMoved[1][1] = true;
+    if (tr === 7 && tc === 0) rookMoved[0][0] = true;
+    if (tr === 7 && tc === 7) rookMoved[0][1] = true;
+    if (tr === 0 && tc === 0) rookMoved[1][0] = true;
+    if (tr === 0 && tc === 7) rookMoved[1][1] = true;
+
+    UpdateClock(whiteTurn);
+    whiteTurn = !whiteTurn;
+
+    moveHistory.push(algebraic);
+    if (IsInCheck(!whiteTurn)) {
+        UndoMove();
+        return false;
+    }
+    return true;
+}
+
+// ============ NEW CORE FUNCTIONS ============
+function PushBoardState() {
+    let bs = {
+        sq: board.map(row => [...row]),
+        wt: whiteTurn,
+        km: [...kingMoved],
+        rm: [ [...rookMoved[0]], [...rookMoved[1]] ],
+        epr: enPassantRow,
+        epc: enPassantCol
+    };
+    boardHistory.push(bs);
+}
+
+function UndoMove() {
+    if (boardHistory.length === 0 || moveHistory.length === 0) return false;
+    let bs = boardHistory.pop();
+    board = bs.sq.map(row => [...row]);
+    whiteTurn = bs.wt;
+    kingMoved = [...bs.km];
+    rookMoved = [ [...bs.rm[0]], [...bs.rm[1]] ];
+    enPassantRow = bs.epr;
+    enPassantCol = bs.epc;
+    moveHistory.pop();
+    return true;
+}
+
+function GetValidMoves(fr, fc) {
+    let moves = [];
+    let piece = board[fr][fc];
+    if (piece === '.') return moves;
+    for (let tr = 0; tr < 8; tr++) {
+        for (let tc = 0; tc < 8; tc++) {
+            if (fr === tr && fc === tc) continue;
+            let dest = board[tr][tc];
+            if (dest !== '.' && IsWhitePiece(piece) === IsWhitePiece(dest)) continue;
+            if (IsValidMove(fr, fc, tr, tc, piece))
+                moves.push({r: tr, c: tc});
+        }
+    }
+    return moves;
+}
+
+function IsSquareAttacked(row, col, byWhite) {
+    for (let r = 0; r < 8; r++)
+        for (let c = 0; c < 8; c++) {
+            let p = board[r][c];
+            if (p === '.') continue;
+            if (byWhite && !IsWhitePiece(p)) continue;
+            if (!byWhite && !IsBlackPiece(p)) continue;
+            if (IsValidMove(r, c, row, col, p))
+                return true;
+        }
+    return false;
+}
+
+function IsInCheck(whiteKing) {
+    for (let r = 0; r < 8; r++)
+        for (let c = 0; c < 8; c++) {
+            let k = whiteKing ? 'K' : 'k';
+            if (board[r][c] === k)
+                return IsSquareAttacked(r, c, !whiteKing);
+        }
+    return false;
+}
+
+// ============ ALGEBRAIC NOTATION ============
+function ToAlgebraic(from, to) {
+    let src = ConvertMove(from), dst = ConvertMove(to);
+    if (!src || !dst) return '';
+    let fr = src.r, fc = src.c, tr = dst.r, tc = dst.c;
+    let piece = board[fr][fc];
+    if (piece === '.') return '';
+
+    if (piece.toLowerCase() === 'k') {
+        if (tc - fc === 2) return 'O-O';
+        if (tc - fc === -2) return 'O-O-O';
+    }
+
+    let capture = (board[tr][tc] !== '.');
+
+    if (piece.toLowerCase() === 'p') {
+        let result = '';
+        if (capture) {
+            result += String.fromCharCode(97 + fc) + 'x';
+        }
+        result += to;
+        if ((IsWhitePiece(piece) && tr === 0) || (IsBlackPiece(piece) && tr === 7))
+            result += '=Q';
+        return result;
+    }
+
+    let pieceChar = piece.toUpperCase();
+    let sources = [];
+    for (let r = 0; r < 8; r++)
+        for (let c = 0; c < 8; c++)
+            if (board[r][c] === piece && IsValidMove(r, c, tr, tc, piece)) {
+                sources.push(String.fromCharCode(97 + c) + String.fromCharCode(48 + (8 - r)));
+            }
+
+    let result = pieceChar;
+
+    if (sources.length > 1) {
+        let otherSameFile = false, otherSameRank = false;
+        let movingFile = String.fromCharCode(97 + fc);
+        let movingRank = String.fromCharCode(48 + (8 - fr));
+        for (let s of sources) {
+            if (s === from) continue;
+            if (s[0] === movingFile) otherSameFile = true;
+            if (s[1] === movingRank) otherSameRank = true;
+        }
+        if (otherSameFile) {
+            if (otherSameRank) { result += movingFile + movingRank; }
+            else { result += movingRank; }
+        } else {
+            result += movingFile;
+        }
+    }
+
+    if (capture) result += 'x';
+    result += to;
+    return result;
+}
+
+function ExportPGN() {
+    let pgn = '[Event "Chess Trainer Game"]\n[Site "?"]\n';
+    let d = new Date();
+    let ds = d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
+    pgn += '[Date "' + ds + '"]\n[Round "?"]\n[White "Player"]\n[Black "Player"]\n[Result "*"]\n\n';
+    for (let i = 0; i < moveHistory.length; i++) {
+        if (i % 2 === 0) pgn += Math.floor(i/2) + 1 + '. ';
+        pgn += moveHistory[i] + ' ';
+    }
+    pgn += '*\n';
+    return pgn;
+}
+
+// ============ ALGEBRAIC NOTATION ============
+function FindPieceSource(pieceLetter, to, fileFilter, rankFilter) {
+    let boardChar = whiteTurn ? pieceLetter : pieceLetter.toLowerCase();
+    let tr = 8 - (to.charCodeAt(1) - 48);
+    let tc = to.charCodeAt(0) - 97;
+    let foundR = -1, foundC = -1, count = 0;
+
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            if (board[r][c] !== boardChar) continue;
+            if (fileFilter && c !== (fileFilter.charCodeAt(0) - 97)) continue;
+            if (rankFilter && (8 - r) !== (rankFilter.charCodeAt(0) - 48)) continue;
+            if (IsValidMove(r, c, tr, tc, board[r][c])) {
+                foundR = r; foundC = c; count++;
+            }
+        }
+    }
+
+    if (count === 1) {
+        let from = String.fromCharCode(97 + foundC) + String.fromCharCode(48 + (8 - foundR));
+        return from;
+    }
+    return '';
+}
+
+function FindPawnSource(to, fileHint) {
+    let tr = 8 - (to.charCodeAt(1) - 48);
+    let tc = to.charCodeAt(0) - 97;
+    let dir = whiteTurn ? -1 : 1;
+    let pawnChar = whiteTurn ? 'P' : 'p';
+    let foundR = -1, foundC = -1, count = 0;
+    let isCapture = (fileHint && fileHint !== to[0]);
+
+    if (isCapture) {
+        let fc = fileHint.charCodeAt(0) - 97;
+        let fr = tr - dir;
+        if (fr >= 0 && fr <= 7 && Math.abs(fc - tc) === 1 && board[fr][fc] === pawnChar) {
+            if (IsValidMove(fr, fc, tr, tc, pawnChar)) {
+                foundR = fr; foundC = fc; count = 1;
+            }
+        }
+    } else {
+        for (let step = 1; step <= 2; step++) {
+            let fr = tr - step * dir;
+            let fc = tc;
+            if (fr >= 0 && fr <= 7 && board[fr][fc] === pawnChar) {
+                if (IsValidMove(fr, fc, tr, tc, pawnChar)) {
+                    foundR = fr; foundC = fc; count++;
+                }
+            }
+        }
+    }
+
+    if (count === 1) {
+        return String.fromCharCode(97 + foundC) + String.fromCharCode(48 + (8 - foundR));
+    }
+    return '';
+}
+
+function ParseAlgebraic(input) {
+    let s = input.trim();
+
+    // Strip check/checkmate symbols
+    while (s.length > 0 && (s[s.length - 1] === '+' || s[s.length - 1] === '#'))
+        s = s.slice(0, -1);
+
+    // Castling
+    if (s === 'O-O' || s === '0-0') {
+        let row = whiteTurn ? 7 : 0;
+        return { from: 'e' + (8 - row), to: 'g' + (8 - row) };
+    }
+    if (s === 'O-O-O' || s === '0-0-0') {
+        let row = whiteTurn ? 7 : 0;
+        return { from: 'e' + (8 - row), to: 'c' + (8 - row) };
+    }
+
+    // Promotion
+    let eq = s.indexOf('=');
+    if (eq !== -1) s = s.substring(0, eq);
+
+    // Strip piece suffix for promotion
+    if (s.length >= 3) {
+        let last = s[s.length - 1];
+        if (last >= 'A' && last <= 'Z' && (last === 'Q' || last === 'R' || last === 'B' || last === 'N'))
+            s = s.slice(0, -1);
+    }
+
+    // Remove x
+    let xPos = s.indexOf('x');
+    if (xPos !== -1) s = s.substring(0, xPos) + s.substring(xPos + 1);
+
+    if (s.length < 2) return null;
+
+    let to = s.substring(s.length - 2);
+    let prefix = s.substring(0, s.length - 2);
+
+    if (prefix.length === 0) {
+        let from = FindPawnSource(to, '');
+        return from ? { from: from, to: to } : null;
+    }
+
+    let first = prefix[0];
+    if (first >= 'A' && first <= 'Z') {
+        let disambig = prefix.substring(1);
+        let fileFilter = '', rankFilter = '';
+        for (let i = 0; i < disambig.length; i++) {
+            if (disambig[i] >= 'a' && disambig[i] <= 'h')
+                fileFilter = disambig[i];
+            else if (disambig[i] >= '1' && disambig[i] <= '8')
+                rankFilter = disambig[i];
+        }
+        let from = FindPieceSource(first, to, fileFilter, rankFilter);
+        return from ? { from: from, to: to } : null;
+    } else {
+        let from = FindPawnSource(to, first);
+        return from ? { from: from, to: to } : null;
+    }
+}
+
+// ============ TEACHING LESSONS DATA ============
+const teachingGames = [
+    { name: "Scholar's Mate", category: "White", difficulty: "Beginner",
+      family: "Italian Game",
+      description: "The fastest checkmate in standard play (4 moves). White delivers checkmate by targeting the weak f7 square.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center and open lines for the bishop and queen" },
+        { from: "e7", to: "e5", comment: "Black stakes their claim in the center too" },
+        { from: "f1", to: "c4", comment: "Develop the bishop to target the weak f7 square" },
+        { from: "b8", to: "c6", comment: "Black develops a knight and defends the e5 pawn" },
+        { from: "d1", to: "h5", comment: "The queen threatens Qxf7#  \u2014 a premature attack but instructive" },
+        { from: "g8", to: "f6", comment: "Black attacks the queen  good defensive instinct" },
+        { from: "h5", to: "f7", comment: "Checkmate! The f7 pawn was only guarded by the king" }
+      ] },
+    { name: "Italian Opening", category: "White", difficulty: "Beginner",
+      family: "Italian Game",
+      description: "One of the oldest and most instructive chess openings. Both sides develop quickly and fight for the center.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center  the #1 opening principle" },
+        { from: "e7", to: "e5", comment: "Black mirrors you, also staking a claim in the center" },
+        { from: "g1", to: "f3", comment: "Develop a knight toward the center and attack the e5 pawn" },
+        { from: "b8", to: "c6", comment: "Black develops and defends the e5 pawn" },
+        { from: "f1", to: "c4", comment: "Develop the bishop to a strong diagonal, targeting f7" },
+        { from: "f8", to: "c5", comment: "Black develops similarly  the classic Italian setup" },
+        { from: "d2", to: "d3", comment: "Support your center pawn and prepare to develop the c1 bishop" },
+        { from: "g8", to: "f6", comment: "Black develops the kingside knight, now attacking e4" },
+        { from: "b1", to: "c3", comment: "Develop the last minor piece  all minor pieces are now active" },
+        { from: "d7", to: "d6", comment: "Black supports e5 and opens the c8 bishop's diagonal" }
+      ] },
+    { name: "Queen's Gambit", category: "White", difficulty: "Beginner",
+      family: "Queen's Gambit",
+      description: "The Queen's Gambit (1.d4 d5 2.c4) is one of the oldest and most respected openings.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center with the queen pawn" },
+        { from: "d7", to: "d5", comment: "Black mirrors, claiming equal space" },
+        { from: "c2", to: "c4", comment: "The Queen's Gambit  White attacks the center from the flank" },
+        { from: "e7", to: "e6", comment: "QGD  Black solidifies d5 and declines the gambit" },
+        { from: "b1", to: "c3", comment: "Knight develops, defending e4 and pressuring d5" },
+        { from: "g8", to: "f6", comment: "Knight develops and defends d5" },
+        { from: "c1", to: "g5", comment: "Pinning the knight on f6 increases pressure on d5" },
+        { from: "f8", to: "e7", comment: "Breaks the pin and develops the bishop" },
+        { from: "e2", to: "e3", comment: "Solidifies the center and prepares to develop the f1 bishop" },
+        { from: "e8", to: "g8", comment: "Black castles kingside for safety" },
+        { from: "g1", to: "f3", comment: "Develops the knight, preparing to castle" }
+      ] },
+    { name: "London System", category: "White", difficulty: "Beginner",
+      family: "London / Colle",
+      description: "The London System (1.d4 2.Bf4 3.e3) is one of the most popular club-level openings.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center with the queen pawn" },
+        { from: "d7", to: "d5", comment: "Black mirrors in the center" },
+        { from: "c1", to: "f4", comment: "The London trademark  develop the bishop before e3" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks d4" },
+        { from: "e2", to: "e3", comment: "Solidifies the center and opens the f1 bishop's diagonal" },
+        { from: "c7", to: "c5", comment: "Black challenges White's center immediately" },
+        { from: "c2", to: "c3", comment: "Support d4 and prepare the b1 knight to develop to d2" },
+        { from: "b8", to: "c6", comment: "Develops the knight and pressures d4" },
+        { from: "g1", to: "f3", comment: "Develops the knight, increasing control of e5" },
+        { from: "c8", to: "g4", comment: "Black develops the bishop, pinning the knight" },
+        { from: "b1", to: "d2", comment: "Knight develops to d2  the standard London setup" },
+        { from: "e7", to: "e6", comment: "Black prepares ...Bd6 and castling" }
+      ] },
+    { name: "Scandinavian Defense", category: "Black", difficulty: "Beginner",
+      family: "Scandinavian",
+      description: "The Scandinavian Defense (1.e4 d5) is Black's most direct response to 1.e4.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "d7", to: "d5", comment: "The Scandinavian  Black immediately challenges e4" },
+        { from: "e4", to: "d5", comment: "White captures" },
+        { from: "d8", to: "d5", comment: "Black recaptures with the queen  the main line" },
+        { from: "b1", to: "c3", comment: "White attacks the queen, gaining time" },
+        { from: "d5", to: "a5", comment: "Queen retreats to the edge, avoiding further harassment" },
+        { from: "d2", to: "d4", comment: "White claims the center" },
+        { from: "g8", to: "f6", comment: "Black develops with tempo" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "c8", to: "g4", comment: "Black develops the bishop, pinning the knight" },
+        { from: "f1", to: "e2", comment: "White breaks the pin" },
+        { from: "c7", to: "c6", comment: "Black prepares to develop the queen back into play" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "a5", to: "c7", comment: "Queen returns to safety and supports the center" }
+      ] },
+    { name: "Philidor Defense", category: "Black", difficulty: "Beginner",
+      family: "Other Open Games",
+      description: "The Philidor Defense (1.e4 e5 2.Nf3 d6) is an old, solid response to 1.e4.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors  the classic response" },
+        { from: "g1", to: "f3", comment: "White develops and attacks e5" },
+        { from: "d7", to: "d6", comment: "The Philidor  Black defends e5 solidly" },
+        { from: "f1", to: "c4", comment: "White develops the bishop to a strong diagonal" },
+        { from: "c8", to: "g4", comment: "Black pins the knight" },
+        { from: "c2", to: "c3", comment: "White prepares d4 to challenge the center" },
+        { from: "g8", to: "f6", comment: "Black develops the knight" },
+        { from: "d2", to: "d4", comment: "White opens the center" },
+        { from: "e5", to: "d4", comment: "Black trades" },
+        { from: "c3", to: "d4", comment: "White recaptures" },
+        { from: "f8", to: "e7", comment: "Black develops and prepares to castle" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e8", to: "g8", comment: "Both sides are safely castled with a solid center" }
+      ] },
+    { name: "Ruy Lopez (Spanish Opening)", category: "White", difficulty: "Intermediate",
+      family: "Ruy Lopez",
+      description: "The Ruy Lopez (1.e4 e5 2.Nf3 Nc6 3.Bb5) is one of the oldest chess openings.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Mirroring White" },
+        { from: "g1", to: "f3", comment: "Develop and attack e5" },
+        { from: "b8", to: "c6", comment: "Defends e5 and develops" },
+        { from: "f1", to: "b5", comment: "The Ruy Lopez  pressuring the knight that defends e5" },
+        { from: "a7", to: "a6", comment: "The Morphy Defense  Black asks what the bishop intends" },
+        { from: "b5", to: "a4", comment: "Retreats, maintaining the pin" },
+        { from: "g8", to: "f6", comment: "Developing and counterattacking e4" },
+        { from: "e1", to: "g1", comment: "White castles kingside" },
+        { from: "f8", to: "e7", comment: "Developing and preparing to castle" },
+        { from: "f1", to: "e1", comment: "Rook to e1, supporting the e4 pawn" },
+        { from: "b7", to: "b5", comment: "Gaining space on the queenside" },
+        { from: "a4", to: "b3", comment: "Bishop retreats to a safe diagonal" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" }
+      ] },
+    { name: "Scotch Game", category: "White", difficulty: "Intermediate",
+      family: "Scotch / Four Knights",
+      description: "The Scotch Game (1.e4 e5 2.Nf3 Nc6 3.d4) is an aggressive, open opening.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop and attack e5" },
+        { from: "b8", to: "c6", comment: "Black defends e5" },
+        { from: "d2", to: "d4", comment: "The Scotch  White immediately challenges the center" },
+        { from: "e5", to: "d4", comment: "Black captures" },
+        { from: "f3", to: "d4", comment: "Knight recaptures, occupying the center" },
+        { from: "f8", to: "c5", comment: "Black develops the bishop aggressively" },
+        { from: "d4", to: "b3", comment: "Attacking the bishop, gaining time" },
+        { from: "c5", to: "b6", comment: "Bishop retreats to a safe square" },
+        { from: "b1", to: "c3", comment: "White develops the other knight" },
+        { from: "d7", to: "d6", comment: "Supports the c5 bishop and prepares ...Nf6" },
+        { from: "f1", to: "c4", comment: "Develops the bishop to a strong diagonal" },
+        { from: "g8", to: "f6", comment: "Develops and attacks e4" }
+      ] },
+    { name: "English Opening", category: "White", difficulty: "Intermediate",
+      family: "Flank Openings",
+      description: "The English Opening (1.c4) is a flank opening that leads to rich positional play.",
+      moves: [
+        { from: "c2", to: "c4", comment: "The English  White fights for the center from the flank" },
+        { from: "e7", to: "e5", comment: "Black claims the center with the king pawn" },
+        { from: "b1", to: "c3", comment: "Develops the knight, supporting c4 and pressuring d5" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks e4" },
+        { from: "g1", to: "f3", comment: "White develops the other knight" },
+        { from: "b8", to: "c6", comment: "Black develops and supports e5" },
+        { from: "e2", to: "e3", comment: "Prepares to develop the f1 bishop" },
+        { from: "f8", to: "b4", comment: "Black pins the knight on c3" },
+        { from: "d1", to: "c2", comment: "Breaks the pin and prepares to castle" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" },
+        { from: "f1", to: "e2", comment: "Develops the bishop and prepares to castle" },
+        { from: "d7", to: "d6", comment: "Black supports e5 and opens the c8 bishop" }
+      ] },
+    { name: "French Defense (Classical Variation)", category: "Black", difficulty: "Intermediate",
+      family: "French Defense",
+      description: "The French Defense (1.e4 e6) is a solid, counterattacking response to 1.e4.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "e7", to: "e6", comment: "The French Defense  Black prepares ...d5" },
+        { from: "d2", to: "d4", comment: "White establishes a strong center" },
+        { from: "d7", to: "d5", comment: "Black immediately challenges White's center" },
+        { from: "b1", to: "c3", comment: "The Classical Variation  White develops and defends e4" },
+        { from: "g8", to: "f6", comment: "Develops the knight and attacks the e4 pawn" },
+        { from: "c1", to: "g5", comment: "Pins the knight on f6, increasing pressure" },
+        { from: "f8", to: "e7", comment: "Breaks the pin and develops the bishop" },
+        { from: "e4", to: "e5", comment: "The center locks  White gains space" },
+        { from: "f6", to: "d7", comment: "Knight retreats to d7, a typical French structure" },
+        { from: "g5", to: "e7", comment: "White trades off the dark-squared bishops" },
+        { from: "d8", to: "e7", comment: "Black recaptures with the queen" },
+        { from: "f2", to: "f4", comment: "White reinforces the e5 pawn" },
+        { from: "c7", to: "c5", comment: "Black begins the standard French counterattack" }
+      ] },
+    { name: "Caro-Kann Defense", category: "Black", difficulty: "Intermediate",
+      family: "Caro-Kann",
+      description: "The Caro-Kann (1.e4 c6 2.d4 d5) is a hyper-solid response to 1.e4.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "c7", to: "c6", comment: "The Caro-Kann  Black prepares ...d5" },
+        { from: "d2", to: "d4", comment: "White establishes a strong pawn center" },
+        { from: "d7", to: "d5", comment: "Black challenges the center immediately" },
+        { from: "b1", to: "c3", comment: "The Classical Variation  develops and defends e4" },
+        { from: "d5", to: "e4", comment: "Black trades pawns to open lines" },
+        { from: "c3", to: "e4", comment: "Knight recaptures, occupying the center" },
+        { from: "c8", to: "f5", comment: "Developing the bishop outside the pawn chain" },
+        { from: "g1", to: "f3", comment: "Develops the knight, attacking the bishop on f5" },
+        { from: "b8", to: "d7", comment: "Prepares ...Ngf6 to challenge the knight" },
+        { from: "f1", to: "c4", comment: "Develops the bishop to a strong diagonal" },
+        { from: "e7", to: "e6", comment: "Solidifies the center" },
+        { from: "e1", to: "g1", comment: "White castles kingside" },
+        { from: "g8", to: "f6", comment: "Challenges the knight on e4" }
+      ] },
+    { name: "Queen's Gambit Declined (Orthodox)", category: "Black", difficulty: "Intermediate",
+      family: "Queen's Gambit",
+      description: "The QGD Orthodox Defense is one of the most solid openings for Black.",
+      moves: [
+        { from: "d2", to: "d4", comment: "White opens with the queen pawn" },
+        { from: "d7", to: "d5", comment: "Black responds in kind" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "e7", to: "e6", comment: "Declined  Black supports d5" },
+        { from: "b1", to: "c3", comment: "Knight to a natural square" },
+        { from: "g8", to: "f6", comment: "Knight develops, defends d5" },
+        { from: "c1", to: "g5", comment: "Pinning the knight" },
+        { from: "f8", to: "e7", comment: "Breaking the pin and developing" },
+        { from: "e2", to: "e3", comment: "Supporting the d4 pawn" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" },
+        { from: "g1", to: "f3", comment: "White develops the other knight" },
+        { from: "b8", to: "d7", comment: "Black develops and prepares ...c5" },
+        { from: "f1", to: "d3", comment: "Developing the bishop to a natural square" },
+        { from: "c7", to: "c5", comment: "Black breaks the center  the standard QGD freeing maneuver" }
+      ] },
+    { name: "Pirc Defense", category: "Black", difficulty: "Intermediate",
+      family: "Pirc / Modern",
+      description: "The Pirc Defense (1.e4 d6 2.d4 Nf6 3.Nc3 g6) is a hypermodern opening.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White takes the center" },
+        { from: "d7", to: "d6", comment: "The Pirc  Black prepares ...Nf6 and ...g6" },
+        { from: "d2", to: "d4", comment: "White builds a strong center" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks e4" },
+        { from: "b1", to: "c3", comment: "White defends e4" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes the king's bishop" },
+        { from: "f1", to: "e2", comment: "White develops" },
+        { from: "f8", to: "g7", comment: "Bishop on the long diagonal  Black's key piece" },
+        { from: "c1", to: "g5", comment: "White pins the knight" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "c7", to: "c6", comment: "Black prepares ...b5 or ...e5 counterplay" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "b8", to: "d7", comment: "Black develops" }
+      ] },
+    { name: "Petroff Defense", category: "Black", difficulty: "Intermediate",
+      family: "Scotch / Four Knights",
+      description: "The Petroff Defense (1.e4 e5 2.Nf3 Nf6) is Black's most solid equalizer against 1.e4.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "White develops and attacks e5" },
+        { from: "g8", to: "f6", comment: "The Petroff  Black counterattacks e4" },
+        { from: "f3", to: "e5", comment: "White takes the pawn" },
+        { from: "d7", to: "d6", comment: "Black attacks the knight and gains time" },
+        { from: "e5", to: "f3", comment: "The knight retreats" },
+        { from: "f6", to: "e4", comment: "Black recaptures the e4 pawn" },
+        { from: "d1", to: "e2", comment: "White attacks the knight and pins it" },
+        { from: "d8", to: "e7", comment: "Black breaks the pin" },
+        { from: "d2", to: "d3", comment: "White attacks the knight" },
+        { from: "e4", to: "f6", comment: "Knight retreats" },
+        { from: "b1", to: "c3", comment: "White develops" },
+        { from: "f8", to: "e7", comment: "Black develops with tempo" }
+      ] },
+    { name: "Catalan Opening", category: "White", difficulty: "Expert",
+      family: "Catalan",
+      description: "The Catalan (1.d4 Nf6 2.c4 e6 3.g3) combines QGD pressure with a kingside fianchetto.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit setup" },
+        { from: "e7", to: "e6", comment: "Black prepares d5" },
+        { from: "g2", to: "g3", comment: "The Catalan  White fianchettoes the king's bishop" },
+        { from: "d7", to: "d5", comment: "Black claims the center" },
+        { from: "f1", to: "g2", comment: "Bishop to the long diagonal  the heart of the Catalan" },
+        { from: "f8", to: "e7", comment: "Black develops" },
+        { from: "g1", to: "f3", comment: "Develops the knight" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "c7", to: "c6", comment: "Black supports d5 and prepares ...b6" },
+        { from: "d1", to: "c2", comment: "Queen supports the center" },
+        { from: "b8", to: "d7", comment: "Develops the knight" }
+      ] },
+    { name: "Queen's Gambit Accepted", category: "White", difficulty: "Expert",
+      family: "Queen's Gambit",
+      description: "The Queen's Gambit Accepted (1.d4 d5 2.c4 dxc4)  White gets a powerful center and active play.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Queen pawn opening" },
+        { from: "d7", to: "d5", comment: "Black responds" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "d5", to: "c4", comment: "QGA  Black accepts the gambit" },
+        { from: "g1", to: "f3", comment: "Develops and prevents Black from holding the pawn" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks d4" },
+        { from: "e2", to: "e3", comment: "Prepares to recapture the pawn with Bxc4" },
+        { from: "c7", to: "c5", comment: "Black challenges the center" },
+        { from: "f1", to: "c4", comment: "Recaptures the pawn  strong center and active pieces" },
+        { from: "e7", to: "e6", comment: "Black supports the d5 square" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "b8", to: "c6", comment: "Black develops and pressures d4" },
+        { from: "d1", to: "e2", comment: "Queen supports the center" },
+        { from: "f8", to: "e7", comment: "Black develops the bishop" }
+      ] },
+    { name: "Reti Opening", category: "White", difficulty: "Expert",
+      family: "Flank Openings",
+      description: "The Reti (1.Nf3) avoids committing in the center, maintaining flexibility.",
+      moves: [
+        { from: "g1", to: "f3", comment: "The Reti  develop and delay center commitment" },
+        { from: "d7", to: "d5", comment: "Black claims the center" },
+        { from: "c2", to: "c4", comment: "White challenges the center from the flank" },
+        { from: "c7", to: "c6", comment: "Black supports d5" },
+        { from: "g2", to: "g3", comment: "Preparing to fianchetto the king's bishop" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop puts pressure on d5" },
+        { from: "c8", to: "g4", comment: "Black pins the knight" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "b8", to: "d7", comment: "Black develops" },
+        { from: "d1", to: "b3", comment: "Queen increases pressure on d5 and b7" },
+        { from: "e7", to: "e6", comment: "Black solidifies the center" },
+        { from: "f1", to: "d1", comment: "Rook to the d-file" },
+        { from: "f8", to: "e7", comment: "Black develops the bishop" }
+      ] },
+    { name: "Sicilian Defense (Najdorf Variation)", category: "Black", difficulty: "Expert",
+      family: "Sicilian Defense",
+      description: "The Sicilian Defense (1.e4 c5) is Black's most aggressive reply to 1.e4.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "c7", to: "c5", comment: "The Sicilian  Black fights for d4 asymmetrically" },
+        { from: "g1", to: "f3", comment: "Develop the knight, preparing d4" },
+        { from: "d7", to: "d6", comment: "Prepares ...Nf6 and supports the c5 pawn" },
+        { from: "d2", to: "d4", comment: "The Open Sicilian  White challenges the center" },
+        { from: "c5", to: "d4", comment: "Black trades pawns" },
+        { from: "f3", to: "d4", comment: "Knight recaptures and occupies d4" },
+        { from: "g8", to: "f6", comment: "Develops the knight, attacking e4" },
+        { from: "b1", to: "c3", comment: "Develops the other knight, defending e4" },
+        { from: "a7", to: "a6", comment: "The Najdorf  prevents Nb5" },
+        { from: "c1", to: "g5", comment: "Develops the bishop, pinning the knight" },
+        { from: "e7", to: "e6", comment: "Solidifies the center" },
+        { from: "f2", to: "f4", comment: "White builds a strong pawn center" },
+        { from: "f8", to: "e7", comment: "Develops the bishop and prepares kingside castling" }
+      ] },
+    { name: "King's Indian Defense", category: "Black", difficulty: "Expert",
+      family: "Indian Defenses",
+      description: "The King's Indian Defense (1.d4 Nf6 2.c4 g6) is a hypermodern opening.",
+      moves: [
+        { from: "d2", to: "d4", comment: "White takes the center" },
+        { from: "g8", to: "f6", comment: "KID  Black develops and invites d4-d5" },
+        { from: "c2", to: "c4", comment: "White reinforces d4" },
+        { from: "g7", to: "g6", comment: "Black prepares to fianchetto the bishop" },
+        { from: "b1", to: "c3", comment: "Developing and supporting the center" },
+        { from: "f8", to: "g7", comment: "Fianchettoing the bishop  Black's key idea" },
+        { from: "e2", to: "e4", comment: "White builds a massive center" },
+        { from: "d7", to: "d6", comment: "Black supports e5" },
+        { from: "g1", to: "f3", comment: "Developing and preparing to castle" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" },
+        { from: "f1", to: "e2", comment: "White develops" },
+        { from: "e7", to: "e5", comment: "Black strikes the center  the KID's central idea" },
+        { from: "e1", to: "g1", comment: "White castles kingside" }
+      ] },
+    { name: "Slav Defense", category: "Black", difficulty: "Expert",
+      family: "Queen's Gambit",
+      description: "The Slav Defense (1.d4 d5 2.c4 c6) develops the light-squared bishop before ...e6.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Queen pawn opening" },
+        { from: "d7", to: "d5", comment: "Black responds" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "c7", to: "c6", comment: "The Slav  Black supports d5 without blocking the bishop" },
+        { from: "b1", to: "c3", comment: "Develops the knight" },
+        { from: "g8", to: "f6", comment: "Attacks c4 and develops" },
+        { from: "c4", to: "d5", comment: "White trades pawns to open lines" },
+        { from: "c6", to: "d5", comment: "Black recaptures" },
+        { from: "g1", to: "f3", comment: "Developing" },
+        { from: "b8", to: "c6", comment: "Developing and putting pressure on d4" },
+        { from: "c1", to: "f4", comment: "Developing the bishop outside the pawn chain" },
+        { from: "c8", to: "f5", comment: "Black develops the bishop before playing e6" },
+        { from: "e2", to: "e3", comment: "Solidifying the center" },
+        { from: "e7", to: "e6", comment: "Black completes the pawn structure" }
+      ] },
+    { name: "Bishop's Opening", category: "White", difficulty: "Beginner",
+      family: "Italian Game",
+      description: "The Bishop's Opening (1.e4 e5 2.Bc4) is one of the oldest chess openings. White develops the bishop immediately, targeting the weak f7 square while keeping flexible options.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center and open lines" },
+        { from: "e7", to: "e5", comment: "Black mirrors, claiming equal space" },
+        { from: "f1", to: "c4", comment: "Develop the bishop to target f7  the heart of the Bishop's Opening" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks the e4 pawn" },
+        { from: "d2", to: "d3", comment: "Support the e4 pawn and prepare to develop" },
+        { from: "b8", to: "c6", comment: "Black develops a knight" },
+        { from: "g1", to: "f3", comment: "Develop the knight toward the center" },
+        { from: "f8", to: "c5", comment: "Black develops the bishop actively" },
+        { from: "b1", to: "c3", comment: "Develop the last minor piece  all pieces are now active" },
+        { from: "d7", to: "d6", comment: "Black supports e5 and opens the c8 bishop" },
+        { from: "e1", to: "g1", comment: "Castle kingside for safety" },
+        { from: "e8", to: "g8", comment: "Black castles too  both sides have developed solidly" }
+      ] },
+    { name: "Four Knights Game", category: "White", difficulty: "Beginner",
+      family: "Scotch / Four Knights",
+      description: "The Four Knights Game (1.e4 e5 2.Nf3 Nc6 3.Nc3 Nf6) is a classic opening where both sides develop knights to their most natural squares.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop a knight and attack e5" },
+        { from: "b8", to: "c6", comment: "Black develops and defends e5" },
+        { from: "b1", to: "c3", comment: "Develop the other knight  the Four Knights formation" },
+        { from: "g8", to: "f6", comment: "Black completes the four knights setup" },
+        { from: "f1", to: "b5", comment: "Pin the knight on c6, increasing pressure on e5" },
+        { from: "f8", to: "b4", comment: "Black returns the pin  symmetrical play" },
+        { from: "e1", to: "g1", comment: "Castle kingside" },
+        { from: "e8", to: "g8", comment: "Black castles too" },
+        { from: "d2", to: "d3", comment: "Solidify the center and prepare to develop the c1 bishop" },
+        { from: "d7", to: "d6", comment: "Black supports the center" }
+      ] },
+    { name: "Alekhine Defense", category: "Black", difficulty: "Beginner",
+      family: "Alekhine Defense",
+      description: "The Alekhine Defense (1.e4 Nf6) is a hypermodern response to 1.e4. Black tempts White to advance pawns and build a big center, then attacks it.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White takes the center" },
+        { from: "g8", to: "f6", comment: "Alekhine Defense  Black invites White to push forward and overextend" },
+        { from: "e4", to: "e5", comment: "White pushes  the main line, gaining space" },
+        { from: "f6", to: "d5", comment: "Knight retreats to a central outpost on d5" },
+        { from: "d2", to: "d4", comment: "White builds a big pawn center" },
+        { from: "d7", to: "d6", comment: "Black immediately challenges White's center" },
+        { from: "g1", to: "f3", comment: "White develops a knight" },
+        { from: "d6", to: "e5", comment: "Black trades to reduce White's center" },
+        { from: "f3", to: "e5", comment: "Knight recaptures in the center" },
+        { from: "c7", to: "c6", comment: "Black prepares ...Bg4 to pin the knight and continue development" }
+      ] },
+    { name: "Vienna Game", category: "White", difficulty: "Intermediate",
+      family: "Scotch / Four Knights",
+      description: "The Vienna Game (1.e4 e5 2.Nc3) is an alternative to the more common 2.Nf3. White delays the kingside knight and often follows up with f2-f4, leading to sharp tactical positions.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "b1", to: "c3", comment: "The Vienna  develop the queen's knight first, keeping flexible options" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks e4" },
+        { from: "f2", to: "f4", comment: "The Vienna Gambit  White challenges Black's center immediately" },
+        { from: "d7", to: "d5", comment: "Black counterattacks in the center  the sharpest reply" },
+        { from: "f4", to: "e5", comment: "White captures, opening lines" },
+        { from: "f6", to: "e4", comment: "Knight recaptures  typical Vienna tactical melee" },
+        { from: "g1", to: "f3", comment: "Develop the knight and defend" },
+        { from: "e4", to: "c3", comment: "Black trades knight for bishop pair" },
+        { from: "d2", to: "c3", comment: "White recaptures, maintaining the pawn center" },
+        { from: "f8", to: "e7", comment: "Black develops and prepares to castle" }
+      ] },
+    { name: "Danish Gambit", category: "White", difficulty: "Intermediate",
+      family: "Other Open Games",
+      description: "The Danish Gambit (1.e4 e5 2.d4 exd4 3.c3) is a sharp opening where White sacrifices one or two pawns for a massive lead in development.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "d2", to: "d4", comment: "Open the center immediately" },
+        { from: "e5", to: "d4", comment: "Black captures the pawn" },
+        { from: "c2", to: "c3", comment: "The Danish Gambit  White offers a pawn for rapid development" },
+        { from: "d4", to: "c3", comment: "Black accepts the gambit" },
+        { from: "f1", to: "c4", comment: "Develop the bishop with a threat, eyeing f7" },
+        { from: "c3", to: "b2", comment: "Black greedily takes a second pawn" },
+        { from: "c1", to: "b2", comment: "White has a massive development lead  both bishops rake the center" },
+        { from: "d8", to: "e7", comment: "Black must be careful  the queen defends f7" }
+      ] },
+    { name: "Modern Defense", category: "Black", difficulty: "Intermediate",
+      family: "Pirc / Modern",
+      description: "The Modern Defense (1.e4 g6) is a flexible, hypermodern opening where Black fianchettoes the king's bishop and allows White to build a big center before counterattacking.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "g7", to: "g6", comment: "The Modern Defense  Black fianchettoes the king's bishop, delaying center commitment" },
+        { from: "d2", to: "d4", comment: "White builds a strong pawn center" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop on g7 will pressure d4 and the long diagonal" },
+        { from: "b1", to: "c3", comment: "White develops and supports the center" },
+        { from: "d7", to: "d6", comment: "Black prepares ...Nf6 while keeping the center flexible" },
+        { from: "g1", to: "f3", comment: "White develops the knight" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks the e4 pawn" },
+        { from: "f1", to: "c4", comment: "White develops the bishop to a strong diagonal" },
+        { from: "e8", to: "g8", comment: "Black castles kingside  king safety first" },
+        { from: "e1", to: "g1", comment: "White castles too  both sides are ready for the middlegame" }
+      ] },
+    { name: "King's Gambit", category: "White", difficulty: "Expert",
+      family: "King's Gambit",
+      description: "The King's Gambit (1.e4 e5 2.f4) is the most famous gambit in chess history. White sacrifices the f-pawn to displace Black's center and launch a kingside attack.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black responds" },
+        { from: "f2", to: "f4", comment: "The King's Gambit  White offers a pawn to dismantle Black's center and open lines" },
+        { from: "e5", to: "f4", comment: "Black accepts  the King's Gambit Accepted" },
+        { from: "g1", to: "f3", comment: "Develop and prevent Qh4+  the most natural response" },
+        { from: "g7", to: "g5", comment: "Black defends the f4 pawn and prepares ...g4 to kick the knight" },
+        { from: "h2", to: "h4", comment: "White challenges Black's pawn chain immediately" },
+        { from: "g5", to: "g4", comment: "Black pushes  the critical test of White's idea" },
+        { from: "f3", to: "e5", comment: "Knight jumps to e5  a classic outpost in the KGA" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks the e4 pawn" },
+        { from: "f1", to: "c4", comment: "Develop the bishop, targeting f7 and the kingside" },
+        { from: "d7", to: "d5", comment: "Black counterattacks in the center  the best defense" },
+        { from: "e4", to: "d5", comment: "White captures, opening the center" },
+        { from: "f8", to: "d6", comment: "Black develops with tempo, attacking the knight on e5" },
+        { from: "e1", to: "g1", comment: "White castles  ready for the attack despite the open f-file" }
+      ] },
+    { name: "Nimzo-Indian Defense", category: "Black", difficulty: "Expert",
+      family: "Indian Defenses",
+      description: "The Nimzo-Indian Defense (1.d4 Nf6 2.c4 e6 3.Nc3 Bb4) is one of the most respected defenses against 1.d4. Black pins the knight, fighting for the center without committing pawns.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Queen pawn opening  White stakes a claim in the center" },
+        { from: "g8", to: "f6", comment: "Black develops and prevents e4" },
+        { from: "c2", to: "c4", comment: "White claims more center space" },
+        { from: "e7", to: "e6", comment: "Black prepares ...Bb4 and keeps the center flexible" },
+        { from: "b1", to: "c3", comment: "The natural developing square" },
+        { from: "f8", to: "b4", comment: "The Nimzo-Indian! Black pins the knight  a world-class defense" },
+        { from: "e2", to: "e3", comment: "White avoids doubled pawns and prepares Bd3" },
+        { from: "e8", to: "g8", comment: "Black castles kingside for safety" },
+        { from: "f1", to: "d3", comment: "Develop the bishop to a natural square" },
+        { from: "d7", to: "d5", comment: "Black challenges the center" },
+        { from: "g1", to: "f3", comment: "Develop the other knight" },
+        { from: "c7", to: "c5", comment: "Black breaks the center  the standard Nimzo freeing maneuver" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "d5", to: "c4", comment: "Black trades to relieve central tension" },
+        { from: "d3", to: "c4", comment: "Bishop recaptures" },
+        { from: "b8", to: "c6", comment: "Develop the last minor piece  Black has a solid, harmonious position" }
+      ] },
+    { name: "Gr\u00fcnfeld Defense", category: "Black", difficulty: "Expert",
+      family: "Indian Defenses",
+      description: "The Gr\u00fcnfeld Defense (1.d4 Nf6 2.c4 g6 3.Nc3 d5) is a hypermodern opening where Black challenges White's center directly with ...d5, unlike the King's Indian.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Queen pawn opening" },
+        { from: "g8", to: "f6", comment: "Black develops and invites d4-d5" },
+        { from: "c2", to: "c4", comment: "White reinforces the center" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes  looks like the KID, but..." },
+        { from: "b1", to: "c3", comment: "Develop the knight" },
+        { from: "d7", to: "d5", comment: "The Gr\u00fcnfeld! Black challenges d4 immediately  the key difference from the KID" },
+        { from: "c4", to: "d5", comment: "The Exchange Variation  the main line, White accepts the challenge" },
+        { from: "f6", to: "d5", comment: "Knight recaptures, occupying the center" },
+        { from: "e2", to: "e4", comment: "White builds a big center, gaining space" },
+        { from: "d5", to: "c3", comment: "Knight trades for the bishop pair" },
+        { from: "b2", to: "c3", comment: "White recaptures with the b-pawn, maintaining the center" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop on the long diagonal  Black's key piece pressures d4" },
+        { from: "f1", to: "c4", comment: "Develop the bishop actively" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" },
+        { from: "g1", to: "e2", comment: "Develop the knight to e2  a typical Gr\u00fcnfeld setup" },
+        { from: "c7", to: "c5", comment: "Black strikes at the center  the Gr\u00fcnfeld's main freeing idea" }
+      ] },
+    { name: "Two Knights Defense", category: "White", difficulty: "Intermediate",
+      family: "Italian Game",
+      description: "The Two Knights Defense (1.e4 e5 2.Nf3 Nc6 3.Bc4 Nf6) is Black's sharpest reply to the Italian. Instead of playing 3...Bc5, Black counterattacks e4 immediately.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop and attack e5" },
+        { from: "b8", to: "c6", comment: "Black defends e5" },
+        { from: "f1", to: "c4", comment: "Italian setup  bishop targets f7" },
+        { from: "g8", to: "f6", comment: "The Two Knights Defense  Black attacks e4 instead of playing Bc5" },
+        { from: "d2", to: "d4", comment: "White opens the center  the critical reply" },
+        { from: "e5", to: "d4", comment: "Black captures" },
+        { from: "e1", to: "g1", comment: "White castles, offering the e4 pawn for a dangerous attack" },
+        { from: "f6", to: "e4", comment: "Black takes the pawn  accepting the challenge" },
+        { from: "f1", to: "e1", comment: "Rook attacks the knight on e4" },
+        { from: "d7", to: "d5", comment: "Black blocks the bishop's diagonal and attacks the knight" },
+        { from: "c4", to: "d5", comment: "White captures  the position is razor-sharp" },
+        { from: "d8", to: "d5", comment: "Black recaptures  both sides have active play" },
+        { from: "b1", to: "c3", comment: "Developing with tempo, attacking the queen" }
+      ] },
+    { name: "Evans Gambit", category: "White", difficulty: "Expert",
+      family: "Italian Game",
+      description: "The Evans Gambit (1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.b4) is one of the most aggressive gambits in chess. White sacrifices a pawn to build a powerful center and attack Black's king.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop and attack e5" },
+        { from: "b8", to: "c6", comment: "Defends e5" },
+        { from: "f1", to: "c4", comment: "Bishop to the classic Italian diagonal" },
+        { from: "f8", to: "c5", comment: "Black develops actively" },
+        { from: "b2", to: "b4", comment: "The Evans Gambit  White offers a pawn to gain time and center control" },
+        { from: "c5", to: "b4", comment: "Black accepts  the main line" },
+        { from: "c2", to: "c3", comment: "White attacks the bishop and gains more center control" },
+        { from: "b4", to: "a5", comment: "Bishop retreats to the edge, keeping the extra pawn" },
+        { from: "d2", to: "d4", comment: "White builds a massive center" },
+        { from: "e5", to: "d4", comment: "Black trades pawns to relieve pressure" },
+        { from: "e1", to: "g1", comment: "White castles, fully developed with dangerous attacking chances" },
+        { from: "d4", to: "c3", comment: "Black returns the gambit pawn to stabilize" },
+        { from: "b1", to: "c3", comment: "Knight recaptures  White has full compensation with a lead in development" }
+      ] },
+    { name: "Berlin Defense", category: "Black", difficulty: "Intermediate",
+      family: "Ruy Lopez",
+      description: "The Berlin Defense (1.e4 e5 2.Nf3 Nc6 3.Bb5 Nf6) became famous when Vladimir Kramnik used it to defeat Garry Kasparov in their 2000 World Championship match. It's a solid equalizer for Black.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "White develops and attacks e5" },
+        { from: "b8", to: "c6", comment: "Black defends e5" },
+        { from: "f1", to: "b5", comment: "The Ruy Lopez  pressuring the knight" },
+        { from: "g8", to: "f6", comment: "The Berlin Defense  Black ignores the threat and counterattacks e4" },
+        { from: "e1", to: "g1", comment: "White castles  main line" },
+        { from: "f6", to: "e4", comment: "Black captures the e4 pawn  the Berlin Wall" },
+        { from: "d2", to: "d4", comment: "White challenges the center" },
+        { from: "e4", to: "d6", comment: "Knight retreats to d6, a key defensive square" },
+        { from: "b5", to: "c6", comment: "White trades bishop for knight to disrupt Black's pawn structure" },
+        { from: "d7", to: "c6", comment: "Black recaptures  doubled isolated c-pawns but the bishop pair" },
+        { from: "d4", to: "e5", comment: "White pushes, gaining space" },
+        { from: "d6", to: "f5", comment: "Knight finds a good outpost on f5" },
+        { from: "d1", to: "d8", comment: "White trades queens to reduce Black's attack" },
+        { from: "e8", to: "d8", comment: "Black recaptures  an equal endgame with the famous Berlin structure" }
+      ] },
+    { name: "Ruy Lopez (Exchange Variation)", category: "White", difficulty: "Intermediate",
+      family: "Ruy Lopez",
+      description: "The Exchange Variation (1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.Bxc6 dxc6) damages Black's pawn structure immediately. Leads to rich positional play with lasting pressure.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop and attack e5" },
+        { from: "b8", to: "c6", comment: "Defends e5" },
+        { from: "f1", to: "b5", comment: "The Ruy Lopez" },
+        { from: "a7", to: "a6", comment: "Black asks what the bishop intends" },
+        { from: "b5", to: "c6", comment: "The Exchange Variation  White trades bishop for knight immediately" },
+        { from: "d7", to: "c6", comment: "Black recaptures  doubled pawns but the bishop pair" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "f8", to: "d6", comment: "Black develops naturally" },
+        { from: "d2", to: "d4", comment: "White opens the center to exploit Black's pawn weaknesses" },
+        { from: "e5", to: "d4", comment: "Black trades" },
+        { from: "f3", to: "d4", comment: "Knight recaptures, occupying a strong central square" },
+        { from: "c6", to: "c5", comment: "Black challenges the knight and gains space" },
+        { from: "d4", to: "f3", comment: "Knight retreats  White maintains pressure on the weakened pawns" }
+      ] },
+    { name: "French Defense (Winawer Variation)", category: "Black", difficulty: "Expert",
+      family: "French Defense",
+      description: "The Winawer (1.e4 e6 2.d4 d5 3.Nc3 Bb4) is the sharpest line of the French. Black pins the knight and creates imbalanced positions. A favorite of world champions.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "e7", to: "e6", comment: "The French Defense" },
+        { from: "d2", to: "d4", comment: "White establishes a strong center" },
+        { from: "d7", to: "d5", comment: "Black immediately challenges" },
+        { from: "b1", to: "c3", comment: "Natural development" },
+        { from: "f8", to: "b4", comment: "The Winawer  Black pins the knight! The critical French variation" },
+        { from: "e4", to: "e5", comment: "White pushes, gaining space and blocking the pin" },
+        { from: "c7", to: "c5", comment: "Black counterattacks the center  the soul of the French" },
+        { from: "a2", to: "a3", comment: "White forces a decision" },
+        { from: "b4", to: "c3", comment: "Black takes the knight, accepting doubled pawns" },
+        { from: "b2", to: "c3", comment: "White recaptures  the Winawer structure" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "d8", to: "c7", comment: "Black supports the counterattack on c5" },
+        { from: "f1", to: "d3", comment: "White develops the bishop to a natural square" },
+        { from: "c5", to: "d4", comment: "Black breaks the center  typical Winawer freeing maneuver" },
+        { from: "c3", to: "d4", comment: "Pawn recaptures, maintaining the center" }
+      ] },
+    { name: "French Defense (Advance Variation)", category: "White", difficulty: "Intermediate",
+      family: "French Defense",
+      description: "The Advance Variation (1.e4 e6 2.d4 d5 3.e5) locks the center and gains space. Leads to slow, strategic battles with blocked pawn chains and a closed center.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e6", comment: "The French Defense" },
+        { from: "d2", to: "d4", comment: "White's second move" },
+        { from: "d7", to: "d5", comment: "Black challenges" },
+        { from: "e4", to: "e5", comment: "The Advance Variation  White locks the center and gains space" },
+        { from: "c7", to: "c5", comment: "Black attacks the base of White's pawn chain" },
+        { from: "c2", to: "c3", comment: "White supports the d4 pawn  the main line" },
+        { from: "b8", to: "c6", comment: "Black develops and pressures d4" },
+        { from: "g1", to: "f3", comment: "White develops naturally" },
+        { from: "d8", to: "b6", comment: "Black attacks the weak b2 pawn and pressures d4" },
+        { from: "a2", to: "a3", comment: "White prevents Nb4 and prepares b4 to support the center" },
+        { from: "c8", to: "d7", comment: "Black develops the bishop" },
+        { from: "b2", to: "b4", comment: "White pushes on the queenside, fixing the pawn structure" },
+        { from: "c5", to: "d4", comment: "Black trades to open lines" },
+        { from: "c3", to: "d4", comment: "White recaptures  strong center, closed position" }
+      ] },
+    { name: "Sicilian Defense (Dragon Variation)", category: "Black", difficulty: "Expert",
+      family: "Sicilian Defense",
+      description: "The Dragon (1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 g6) is the sharpest Sicilian line. Black fianchettoes the king's bishop, leading to explosive attacking positions.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "c7", to: "c5", comment: "The Sicilian Defense" },
+        { from: "g1", to: "f3", comment: "Developing and preparing d4" },
+        { from: "d7", to: "d6", comment: "Supporting c5 and preparing ...Nf6" },
+        { from: "d2", to: "d4", comment: "The Open Sicilian  White opens the center" },
+        { from: "c5", to: "d4", comment: "Black trades to open the c-file" },
+        { from: "f3", to: "d4", comment: "Knight recaptures, occupying a central outpost" },
+        { from: "g8", to: "f6", comment: "Developing and attacking e4" },
+        { from: "b1", to: "c3", comment: "Defending e4 and developing" },
+        { from: "g7", to: "g6", comment: "The Dragon  Black fianchettoes the king's bishop!" },
+        { from: "c1", to: "e3", comment: "White prepares the Yugoslav Attack  the Dragon's critical test" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop on g7  Black's key piece" },
+        { from: "f2", to: "f3", comment: "White prepares to expand with g4 and prevents Ng4" },
+        { from: "e8", to: "g8", comment: "Black castles kingside into the attack" },
+        { from: "d1", to: "d2", comment: "White prepares Bh6 to trade off Black's powerful bishop" },
+        { from: "b8", to: "c6", comment: "Black develops the knight" }
+      ] },
+    { name: "Queen's Gambit Declined (Semi-Slav)", category: "Black", difficulty: "Intermediate",
+      family: "Queen's Gambit",
+      description: "The Semi-Slav (1.d4 d5 2.c4 e6 3.Nc3 Nf6 4.Nf3 c6) combines the Slav and the QGD. One of the most complex and respected openings in modern chess.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Queen's pawn opening" },
+        { from: "d7", to: "d5", comment: "Black mirrors" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "e7", to: "e6", comment: "Declined  Black supports d5" },
+        { from: "b1", to: "c3", comment: "Developing and pressuring d5" },
+        { from: "g8", to: "f6", comment: "Developing and defending d5" },
+        { from: "g1", to: "f3", comment: "White develops the other knight" },
+        { from: "c7", to: "c6", comment: "The Semi-Slav  Black supports d5 without blocking the c8 bishop" },
+        { from: "e2", to: "e3", comment: "White prepares Bd3" },
+        { from: "b8", to: "d7", comment: "Black develops the other knight" },
+        { from: "f1", to: "d3", comment: "Bishop to a natural square" },
+        { from: "f8", to: "d6", comment: "Black develops and prepares to castle" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e8", to: "g8", comment: "Black castles  the classic Semi-Slav setup, solid and flexible" }
+      ] },
+    { name: "Albin Counter-Gambit", category: "Black", difficulty: "Intermediate",
+      family: "Queen's Gambit",
+      description: "The Albin Counter-Gambit (1.d4 d5 2.c4 e5) is a sharp response to the Queen's Gambit. Black sacrifices a pawn to seize the center and create tricky tactical chances.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Queen pawn opening" },
+        { from: "d7", to: "d5", comment: "Black mirrors" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "e7", to: "e5", comment: "The Albin Counter-Gambit  Black offers a pawn to disrupt White's center" },
+        { from: "d4", to: "e5", comment: "White accepts" },
+        { from: "d5", to: "d4", comment: "Black pushes  the point! White's knight has no good square" },
+        { from: "g1", to: "f3", comment: "White develops and prepares to undermine d4" },
+        { from: "b8", to: "c6", comment: "Black develops and attacks the e5 pawn" },
+        { from: "b1", to: "d2", comment: "White defends e5 and prepares Nb3" },
+        { from: "c8", to: "g4", comment: "Black pins the knight, increasing pressure" },
+        { from: "a2", to: "a3", comment: "White prepares b4 to attack Black's pawn chain" },
+        { from: "d8", to: "e7", comment: "Black defends e5 indirectly" },
+        { from: "h2", to: "h3", comment: "White asks the bishop what it intends" },
+        { from: "g4", to: "h5", comment: "Bishop stays on the diagonal  Black maintains pressure" }
+      ] },
+    { name: "Dutch Defense", category: "Black", difficulty: "Intermediate",
+      family: "Dutch Defense",
+      description: "The Dutch Defense (1.d4 f5) is an aggressive, asymmetrical response to 1.d4. Black immediately stakes a claim on the kingside and prepares a direct kingside attack.",
+      moves: [
+        { from: "d2", to: "d4", comment: "White claims the center" },
+        { from: "f7", to: "f5", comment: "The Dutch Defense  Black controls e4 and prepares a kingside attack" },
+        { from: "g2", to: "g3", comment: "White's most flexible response  preparing to fianchetto" },
+        { from: "g8", to: "f6", comment: "Black develops and prepares to control e4" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop  White eyes the long diagonal" },
+        { from: "e7", to: "e6", comment: "Black solidifies the center and opens the f8 bishop" },
+        { from: "g1", to: "f3", comment: "White develops the knight" },
+        { from: "f8", to: "e7", comment: "Black develops the bishop" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e8", to: "g8", comment: "Black castles  typical Stonewall Dutch structure" },
+        { from: "c2", to: "c4", comment: "White gains space on the queenside" },
+        { from: "d7", to: "d6", comment: "Black supports e5 and prepares to play ...e5" },
+        { from: "b1", to: "c3", comment: "White develops the other knight" }
+      ] },
+    { name: "Colle System", category: "White", difficulty: "Beginner",
+      family: "London / Colle",
+      description: "The Colle System (1.d4 d5 2.Nf3 Nf6 3.e3) is a solid, easy-to-learn opening. White builds a flexible setup with Bd3, c3, and Nbd2. Perfect for beginners who want a reliable system without memorizing long theory.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center" },
+        { from: "d7", to: "d5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop the knight" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "e2", to: "e3", comment: "The Colle  White prepares Bd3 and keeps options open" },
+        { from: "e7", to: "e6", comment: "Black solidifies the center" },
+        { from: "f1", to: "d3", comment: "Bishop to the key diagonal  the Colle setup" },
+        { from: "c7", to: "c5", comment: "Black challenges the center" },
+        { from: "c2", to: "c3", comment: "White supports the d4 pawn  the Colle structure" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "b1", to: "d2", comment: "Knight to d2  the classic Colle setup, avoiding blocking the bishop" },
+        { from: "f8", to: "d6", comment: "Black develops naturally" },
+        { from: "e1", to: "g1", comment: "Castle kingside  White has a solid, harmonious position" }
+      ] },
+    { name: "Benko Gambit", category: "Black", difficulty: "Expert",
+      family: "Indian Defenses",
+      description: "The Benko Gambit (1.d4 Nf6 2.c4 c5 3.d5 b5) sacrifices a pawn to activate the rook on a8 and create lasting pressure along the a- and b-files. A favorite of attacking players.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Queen pawn opening" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "c2", to: "c4", comment: "White claims more center space" },
+        { from: "c7", to: "c5", comment: "Black fights for the center asymmetrically" },
+        { from: "d4", to: "d5", comment: "White pushes  closing the center" },
+        { from: "b7", to: "b5", comment: "The Benko Gambit! Black offers a pawn for long-term pressure" },
+        { from: "c4", to: "b5", comment: "White accepts  the main line" },
+        { from: "a7", to: "a6", comment: "Black offers a second pawn to open lines" },
+        { from: "b5", to: "a6", comment: "White takes  Black now has open a- and b-files" },
+        { from: "c8", to: "a6", comment: "Black recaptures with the bishop, developing with tempo" },
+        { from: "b1", to: "c3", comment: "White develops the knight" },
+        { from: "d7", to: "d6", comment: "Black supports c5 and prepares ...Nbd7" },
+        { from: "e2", to: "e4", comment: "White builds a big center" },
+        { from: "a6", to: "f1", comment: "Black trades bishop for rook after castling" },
+        { from: "e1", to: "f1", comment: "White recaptures  Black has full compensation with open files" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes the king's bishop for the long diagonal" }
+      ] },
+    { name: "King's Gambit (Falkbeer Counter-Gambit)", category: "Black", difficulty: "Intermediate",
+      family: "King's Gambit",
+      description: "The Falkbeer Counter-Gambit (1.e4 e5 2.f4 d5) is Black's sharpest response to the King's Gambit. Black counterattacks the center instead of accepting.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "f2", to: "f4", comment: "The King's Gambit" },
+        { from: "d7", to: "d5", comment: "Falkbeer! Black strikes the center" },
+        { from: "f4", to: "e5", comment: "White captures, keeping the center locked" },
+        { from: "c7", to: "c5", comment: "Black attacks the pawn chain" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "b8", to: "c6", comment: "Black develops and attacks e5" },
+        { from: "d2", to: "d4", comment: "White solidifies" },
+        { from: "c5", to: "d4", comment: "Black trades to open lines" },
+        { from: "f3", to: "d4", comment: "Knight occupies the center" },
+        { from: "d8", to: "h4", comment: "Queen check — Black's counterplay" },
+        { from: "g2", to: "g3", comment: "White blocks, weakening the kingside" },
+        { from: "h4", to: "e7", comment: "Queen retreats — sharp middlegame ahead" }
+      ] },
+    { name: "King's Gambit Declined", category: "Black", difficulty: "Intermediate",
+      family: "King's Gambit",
+      description: "The King's Gambit Declined (1.e4 e5 2.f4 Bc5) refuses the gambit. Black's bishop on c5 prevents castling and controls the position.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "e7", to: "e5", comment: "Black responds" },
+        { from: "f2", to: "f4", comment: "The King's Gambit" },
+        { from: "f8", to: "c5", comment: "Declined! Black develops the bishop aggressively" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "d7", to: "d6", comment: "Black supports e5" },
+        { from: "f4", to: "e5", comment: "White trades to open lines" },
+        { from: "d6", to: "e5", comment: "Black recaptures" },
+        { from: "d2", to: "d4", comment: "White attacks the bishop and the center" },
+        { from: "e5", to: "d4", comment: "Black trades" },
+        { from: "f3", to: "d4", comment: "Knight attacks the bishop" },
+        { from: "c5", to: "d4", comment: "Black trades bishop for knight" },
+        { from: "d1", to: "d4", comment: "Queen recaptures — White has the center" },
+        { from: "b8", to: "c6", comment: "Black develops with tempo" },
+        { from: "d4", to: "d1", comment: "Queen retreats — equal position" }
+      ] },
+    { name: "King's Gambit (Kieseritzky Gambit)", category: "White", difficulty: "Expert",
+      family: "King's Gambit",
+      description: "The Kieseritzky Gambit (1.e4 e5 2.f4 exf4 3.Nf3 g5 4.h4 g4 5.Ne5) is the most famous line of the King's Gambit. White sacrifices a knight for a devastating attack.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black responds" },
+        { from: "f2", to: "f4", comment: "King's Gambit" },
+        { from: "e5", to: "f4", comment: "Accepted" },
+        { from: "g1", to: "f3", comment: "Prevents Qh4+" },
+        { from: "g7", to: "g5", comment: "Black defends f4" },
+        { from: "h2", to: "h4", comment: "White attacks the pawn chain" },
+        { from: "g5", to: "g4", comment: "Black pushes the knight" },
+        { from: "f3", to: "e5", comment: "Kieseritzky! The knight sacrifice" },
+        { from: "d7", to: "d6", comment: "Black attacks the knight" },
+        { from: "e5", to: "g4", comment: "Knight captures g4" },
+        { from: "d8", to: "e7", comment: "Black develops the queen" },
+        { from: "d1", to: "e2", comment: "White defends the knight" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "g4", to: "f6", comment: "Knight trade" },
+        { from: "e7", to: "f6", comment: "Black recaptures" },
+        { from: "d2", to: "d4", comment: "White builds a center" },
+        { from: "f8", to: "e7", comment: "Black develops" }
+      ] },
+    { name: "Caro-Kann Defense (Advance Variation)", category: "White", difficulty: "Intermediate",
+      family: "Caro-Kann",
+      description: "The Advance Variation (1.e4 c6 2.d4 d5 3.e5) locks the center. Black's light-squared bishop develops outside the pawn chain — a Caro-Kann hallmark.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "c7", to: "c6", comment: "Caro-Kann" },
+        { from: "d2", to: "d4", comment: "Strong center" },
+        { from: "d7", to: "d5", comment: "Black challenges" },
+        { from: "e4", to: "e5", comment: "Advance! White gains space" },
+        { from: "c8", to: "f5", comment: "Bishop outside the pawn chain — Caro-Kann's key idea" },
+        { from: "f1", to: "d3", comment: "White attacks the bishop" },
+        { from: "f5", to: "d3", comment: "Black trades" },
+        { from: "d1", to: "d3", comment: "Queen recaptures actively" },
+        { from: "e7", to: "e6", comment: "Black solidifies" },
+        { from: "g1", to: "e2", comment: "White develops flexibly" },
+        { from: "d8", to: "b6", comment: "Black pressures b2 and d4" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "g8", to: "e7", comment: "Black develops the knight" }
+      ] },
+    { name: "Caro-Kann Defense (Exchange Variation)", category: "White", difficulty: "Beginner",
+      family: "Caro-Kann",
+      description: "The Exchange Variation (1.e4 c6 2.d4 d5 3.exd5 cxd5) is a solid, positional system. White plays for a slight development advantage in a symmetrical structure.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "c7", to: "c6", comment: "Caro-Kann" },
+        { from: "d2", to: "d4", comment: "Strong center" },
+        { from: "d7", to: "d5", comment: "Black challenges" },
+        { from: "e4", to: "d5", comment: "Exchange Variation" },
+        { from: "c6", to: "d5", comment: "Symmetrical structure" },
+        { from: "f1", to: "d3", comment: "Develop the bishop" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "c2", to: "c3", comment: "Supports d4" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "c8", to: "g4", comment: "Black pins the knight" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e7", to: "e6", comment: "Black prepares Bd6" }
+      ] },
+    { name: "Caro-Kann Defense (Panov-Botvinnik Attack)", category: "White", difficulty: "Expert",
+      family: "Caro-Kann",
+      description: "The Panov-Botvinnik Attack (1.e4 c6 2.d4 d5 3.exd5 cxd5 4.c4) is a Queen's Gambit hybrid. Leads to open, tactical positions. A favorite of World Champion Mikhail Botvinnik.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "c7", to: "c6", comment: "Caro-Kann" },
+        { from: "d2", to: "d4", comment: "Strong center" },
+        { from: "d7", to: "d5", comment: "Black challenges" },
+        { from: "e4", to: "d5", comment: "White exchanges" },
+        { from: "c6", to: "d5", comment: "Black recaptures" },
+        { from: "c2", to: "c4", comment: "Panov-Botvinnik! A QG setup against the Caro-Kann" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks c4" },
+        { from: "b1", to: "c3", comment: "White defends and develops" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes" },
+        { from: "c4", to: "d5", comment: "White opens the position" },
+        { from: "f6", to: "d5", comment: "Knight recaptures actively" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop" },
+        { from: "f1", to: "c4", comment: "White develops actively" },
+        { from: "e8", to: "g8", comment: "Black castles — sharp mutual chances" }
+      ] },
+    { name: "Ruy Lopez (Chigorin Variation)", category: "Black", difficulty: "Expert",
+      family: "Ruy Lopez",
+      description: "The Chigorin (1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.Ba4 Nf6 5.O-O Be7 6.Re1 b5 7.Bb3 d6 8.c3 O-O 9.h3 Na5) is the classical main line. Black counterattacks the bishop and prepares queenside expansion.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop and attack e5" },
+        { from: "b8", to: "c6", comment: "Black defends e5" },
+        { from: "f1", to: "b5", comment: "The Ruy Lopez" },
+        { from: "a7", to: "a6", comment: "Morphy Defense — what does the bishop intend?" },
+        { from: "b5", to: "a4", comment: "Bishop retreats, maintaining the pin" },
+        { from: "g8", to: "f6", comment: "Black develops and attacks e4" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "f8", to: "e7", comment: "Black develops" },
+        { from: "f1", to: "e1", comment: "Rook supports e4" },
+        { from: "b7", to: "b5", comment: "Black gains queenside space" },
+        { from: "a4", to: "b3", comment: "Bishop returns to the diagonal" },
+        { from: "d7", to: "d6", comment: "Black supports e5" },
+        { from: "c2", to: "c3", comment: "Preparing d4" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "h2", to: "h3", comment: "Prevents ...Bg4, prepares slow kingside attack" },
+        { from: "c6", to: "a5", comment: "Chigorin! Black attacks the bishop" }
+      ] },
+    { name: "French Defense (Tarrasch Variation)", category: "White", difficulty: "Intermediate",
+      family: "French Defense",
+      description: "The Tarrasch Variation (1.e4 e6 2.d4 d5 3.Nd2) avoids the Winawer pin. A solid, positional system favored by Karpov.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e6", comment: "The French Defense" },
+        { from: "d2", to: "d4", comment: "Strong center" },
+        { from: "d7", to: "d5", comment: "Black challenges" },
+        { from: "b1", to: "d2", comment: "Tarrasch! Knight to d2, avoiding the Winawer" },
+        { from: "g8", to: "f6", comment: "Black attacks e4" },
+        { from: "e4", to: "e5", comment: "White gains space" },
+        { from: "f6", to: "d7", comment: "Knight retreats" },
+        { from: "f1", to: "d3", comment: "Develop the bishop" },
+        { from: "c7", to: "c5", comment: "Black counterattacks" },
+        { from: "c2", to: "c3", comment: "Supports d4" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "g1", to: "e2", comment: "Knight to e2, keeping the c1 diagonal open" },
+        { from: "c5", to: "d4", comment: "Black trades" },
+        { from: "c3", to: "d4", comment: "Solid Tarrasch structure" }
+      ] },
+    { name: "Sicilian Defense (Classical Variation)", category: "White", difficulty: "Intermediate",
+      family: "Sicilian Defense",
+      description: "The Classical Sicilian (1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 Nc6) is the most natural development in the Open Sicilian. Both sides develop logically.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "c7", to: "c5", comment: "Sicilian Defense" },
+        { from: "g1", to: "f3", comment: "Develop and prepare d4" },
+        { from: "d7", to: "d6", comment: "Supports c5" },
+        { from: "d2", to: "d4", comment: "Open Sicilian" },
+        { from: "c5", to: "d4", comment: "Black trades" },
+        { from: "f3", to: "d4", comment: "Knight recaptures" },
+        { from: "g8", to: "f6", comment: "Black attacks e4" },
+        { from: "b1", to: "c3", comment: "White defends e4" },
+        { from: "b8", to: "c6", comment: "Classical Sicilian — knights on c6 and f6" },
+        { from: "c1", to: "g5", comment: "White pins the knight" },
+        { from: "e7", to: "e6", comment: "Black prepares ...Be7" },
+        { from: "d1", to: "d2", comment: "Supports the bishop" },
+        { from: "f8", to: "e7", comment: "Black develops" },
+        { from: "e1", to: "c1", comment: "White castles queenside" },
+        { from: "e8", to: "g8", comment: "Black castles kingside" }
+      ] },
+    { name: "Sicilian Defense (Scheveningen Variation)", category: "Black", difficulty: "Expert",
+      family: "Sicilian Defense",
+      description: "The Scheveningen (1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 e6) is Black's most flexible Sicilian. The 'small center' with e6 gives solid defense and counterattacking chances.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "c7", to: "c5", comment: "Sicilian Defense" },
+        { from: "g1", to: "f3", comment: "Develop" },
+        { from: "d7", to: "d6", comment: "Supports c5" },
+        { from: "d2", to: "d4", comment: "Open Sicilian" },
+        { from: "c5", to: "d4", comment: "Black trades" },
+        { from: "f3", to: "d4", comment: "Knight recaptures" },
+        { from: "g8", to: "f6", comment: "Black attacks e4" },
+        { from: "b1", to: "c3", comment: "White defends e4" },
+        { from: "e7", to: "e6", comment: "Scheveningen! Flexible 'small center'" },
+        { from: "f1", to: "e2", comment: "White develops" },
+        { from: "f8", to: "e7", comment: "Black develops" },
+        { from: "c1", to: "e3", comment: "White develops" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "g2", to: "g4", comment: "Keres Attack! Direct kingside assault" },
+        { from: "h7", to: "h6", comment: "Black prepares to meet the attack" }
+      ] },
+    { name: "Pirc Defense (Austrian Attack)", category: "White", difficulty: "Expert",
+      family: "Pirc / Modern",
+      description: "The Austrian Attack (1.e4 d6 2.d4 Nf6 3.Nc3 g6 4.f4) is White's sharpest line against the Pirc. White builds a massive pawn center and launches a direct kingside attack.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "d7", to: "d6", comment: "Pirc Defense" },
+        { from: "d2", to: "d4", comment: "Strong center" },
+        { from: "g8", to: "f6", comment: "Black attacks e4" },
+        { from: "b1", to: "c3", comment: "White defends e4" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes" },
+        { from: "f2", to: "f4", comment: "Austrian Attack! Massive center" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "f1", to: "d3", comment: "White develops, eyeing h6" },
+        { from: "b8", to: "a6", comment: "Black prepares c5" },
+        { from: "e4", to: "e5", comment: "White pushes forward" },
+        { from: "f6", to: "d7", comment: "Knight retreats" }
+      ] },
+    { name: "Pirc Defense (150 Attack)", category: "White", difficulty: "Intermediate",
+      family: "Pirc / Modern",
+      description: "The 150 Attack (1.e4 d6 2.d4 Nf6 3.Nc3 g6 4.Be3) is a popular system against the Pirc. White develops quietly then attacks with Qd2 and long castling.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "d7", to: "d6", comment: "Pirc Defense" },
+        { from: "d2", to: "d4", comment: "Strong center" },
+        { from: "g8", to: "f6", comment: "Black attacks e4" },
+        { from: "b1", to: "c3", comment: "White defends e4" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes" },
+        { from: "c1", to: "e3", comment: "150 Attack — Be3, preparing Qd2" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop" },
+        { from: "d1", to: "d2", comment: "Queen supports the bishop" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "e1", to: "c1", comment: "White castles queenside" },
+        { from: "c7", to: "c6", comment: "Black prepares b5" },
+        { from: "h2", to: "h4", comment: "Kingside pawn storm" },
+        { from: "b7", to: "b5", comment: "Black counterattacks" }
+      ] },
+    { name: "Alekhine Defense (Four Pawns Attack)", category: "White", difficulty: "Expert",
+      family: "Alekhine Defense",
+      description: "The Four Pawns Attack (1.e4 Nf6 2.e5 Nd5 3.d4 d6 4.c4 Nb6 5.f4) is White's most aggressive line. A massive pawn center tries to crush Black by space advantage.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "g8", to: "f6", comment: "Alekhine Defense" },
+        { from: "e4", to: "e5", comment: "White pushes" },
+        { from: "f6", to: "d5", comment: "Knight to the center" },
+        { from: "d2", to: "d4", comment: "Building the center" },
+        { from: "d7", to: "d6", comment: "Black challenges" },
+        { from: "c2", to: "c4", comment: "Kick the knight" },
+        { from: "d5", to: "b6", comment: "Knight to the edge" },
+        { from: "f2", to: "f4", comment: "Four Pawns Attack!" },
+        { from: "d6", to: "e5", comment: "Black trades to reduce the center" },
+        { from: "f4", to: "e5", comment: "White recaptures" },
+        { from: "b8", to: "c6", comment: "Black develops, attacks d4" },
+        { from: "c1", to: "e3", comment: "White develops" },
+        { from: "c8", to: "f5", comment: "Black develops actively" },
+        { from: "g1", to: "f3", comment: "White develops" }
+      ] },
+    { name: "Alekhine Defense (Exchange Variation)", category: "White", difficulty: "Intermediate",
+      family: "Alekhine Defense",
+      description: "The Exchange Variation (1.e4 Nf6 2.e5 Nd5 3.d4 d6 4.c4 Nb6 5.exd6) simplifies early. White accepts a slight space advantage in a clean, positional middlegame.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "g8", to: "f6", comment: "Alekhine Defense" },
+        { from: "e4", to: "e5", comment: "White pushes" },
+        { from: "f6", to: "d5", comment: "Knight retreats" },
+        { from: "d2", to: "d4", comment: "Building the center" },
+        { from: "d7", to: "d6", comment: "Black challenges" },
+        { from: "c2", to: "c4", comment: "Kick the knight" },
+        { from: "d5", to: "b6", comment: "Knight to the edge" },
+        { from: "e5", to: "d6", comment: "Exchange Variation" },
+        { from: "c7", to: "d6", comment: "Black recaptures with the c-pawn" },
+        { from: "c4", to: "c5", comment: "Attack the knight, gain space" },
+        { from: "b6", to: "d5", comment: "Knight returns to the center" },
+        { from: "b1", to: "c3", comment: "White develops" },
+        { from: "e7", to: "e6", comment: "Black supports the knight" },
+        { from: "g1", to: "f3", comment: "White develops" }
+      ] },
+    { name: "Alekhine Defense (Modern Variation)", category: "White", difficulty: "Intermediate",
+      family: "Alekhine Defense",
+      description: "The Modern Variation (1.e4 Nf6 2.e5 Nd5 3.d4 d6 4.Nf3) develops naturally before pushing c4. A flexible, strategic approach to the Alekhine.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "g8", to: "f6", comment: "Alekhine Defense" },
+        { from: "e4", to: "e5", comment: "White pushes" },
+        { from: "f6", to: "d5", comment: "Knight retreats" },
+        { from: "d2", to: "d4", comment: "Building the center" },
+        { from: "d7", to: "d6", comment: "Black challenges" },
+        { from: "g1", to: "f3", comment: "Modern Variation — develop first, push later" },
+        { from: "c8", to: "g4", comment: "Black pins the knight" },
+        { from: "f1", to: "e2", comment: "Break the pin" },
+        { from: "e7", to: "e6", comment: "Black solidifies" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "f8", to: "e7", comment: "Black develops" },
+        { from: "c2", to: "c4", comment: "Now White kicks the knight" },
+        { from: "d5", to: "b6", comment: "Knight retreats" }
+      ] },
+    { name: "Scandinavian Defense (2...Nf6 Variation)", category: "Black", difficulty: "Intermediate",
+      family: "Scandinavian",
+      description: "The 2...Nf6 Variation (1.e4 d5 2.exd5 Nf6) avoids exposing the queen. Black sacrifices a pawn temporarily for quick development and active play.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "d7", to: "d5", comment: "Scandinavian" },
+        { from: "e4", to: "d5", comment: "White captures" },
+        { from: "g8", to: "f6", comment: "2...Nf6 — Black develops with tempo" },
+        { from: "d2", to: "d4", comment: "White protects d5" },
+        { from: "f6", to: "d5", comment: "Knight recaptures" },
+        { from: "c2", to: "c4", comment: "White attacks the knight" },
+        { from: "d5", to: "b6", comment: "Knight retreats" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes" },
+        { from: "b1", to: "c3", comment: "White develops" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop" },
+        { from: "c1", to: "e3", comment: "White develops" },
+        { from: "e8", to: "g8", comment: "Black castles" }
+      ] },
+    { name: "Scandinavian Defense (Icelandic Gambit)", category: "Black", difficulty: "Expert",
+      family: "Scandinavian",
+      description: "The Icelandic Gambit (1.e4 d5 2.exd5 Nf6 3.c4 e6) sacrifices a second pawn for a massive lead in development. A sharp, aggressive club weapon.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "d7", to: "d5", comment: "Scandinavian" },
+        { from: "e4", to: "d5", comment: "White captures" },
+        { from: "g8", to: "f6", comment: "2...Nf6 setup" },
+        { from: "c2", to: "c4", comment: "White protects the pawn" },
+        { from: "e7", to: "e6", comment: "Icelandic Gambit! Black offers a second pawn" },
+        { from: "d5", to: "e6", comment: "White accepts" },
+        { from: "f8", to: "c5", comment: "Black develops with a threat on f2" },
+        { from: "g1", to: "f3", comment: "White blocks the threat" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "f1", to: "e2", comment: "White develops" },
+        { from: "e8", to: "g8", comment: "Black castles with attack" },
+        { from: "e1", to: "g1", comment: "White castles" }
+      ] },
+    { name: "Scandinavian Defense (Modern Scandinavian)", category: "Black", difficulty: "Intermediate",
+      family: "Scandinavian",
+      description: "The Modern Scandinavian (1.e4 d5 2.exd5 Nf6 3.d4 Nxd5) recaptures with the knight on d5. A solid, reliable setup often followed by ...g6 and ...Bg7.",
+      moves: [
+        { from: "e2", to: "e4", comment: "White claims the center" },
+        { from: "d7", to: "d5", comment: "Scandinavian" },
+        { from: "e4", to: "d5", comment: "White captures" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "d2", to: "d4", comment: "White builds the center" },
+        { from: "f6", to: "d5", comment: "Knight recaptures on d5" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes" },
+        { from: "f1", to: "c4", comment: "White develops actively" },
+        { from: "d5", to: "b6", comment: "Black attacks the bishop" },
+        { from: "c4", to: "b3", comment: "Bishop retreats" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e8", to: "g8", comment: "Black castles" }
+      ] },
+    { name: "Catalan Opening (Open Variation)", category: "White", difficulty: "Expert",
+      family: "Catalan",
+      description: "The Open Catalan (1.d4 Nf6 2.c4 e6 3.g3 d5 4.Bg2 dxc4) captures the c4 pawn. Black gives it back for quick development, while White gets a strong center and active bishop.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "e7", to: "e6", comment: "Prepares d5" },
+        { from: "g2", to: "g3", comment: "Catalan setup" },
+        { from: "d7", to: "d5", comment: "Black claims the center" },
+        { from: "f1", to: "g2", comment: "Bishop on the long diagonal" },
+        { from: "d5", to: "c4", comment: "Open Catalan! Black takes the pawn" },
+        { from: "d1", to: "c2", comment: "Queen attacks c4" },
+        { from: "a7", to: "a6", comment: "Black prepares ...b5" },
+        { from: "c2", to: "c4", comment: "Queen recaptures" },
+        { from: "f8", to: "e7", comment: "Black develops" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "b1", to: "c3", comment: "White develops" }
+      ] },
+    { name: "Catalan Opening (Closed Variation)", category: "White", difficulty: "Intermediate",
+      family: "Catalan",
+      description: "The Closed Catalan (1.d4 Nf6 2.c4 e6 3.g3 d5 4.Bg2 Be7) holds the center with d5 and e6. Leads to slow, strategic maneuvering and positional play.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "e7", to: "e6", comment: "Prepares d5" },
+        { from: "g2", to: "g3", comment: "Catalan setup" },
+        { from: "d7", to: "d5", comment: "Black claims the center" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop" },
+        { from: "f8", to: "e7", comment: "Closed Catalan" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "c7", to: "c6", comment: "Black supports d5" },
+        { from: "d1", to: "c2", comment: "Queen supports the center" },
+        { from: "b8", to: "d7", comment: "Black develops" }
+      ] },
+    { name: "Catalan Opening (with ...a6)", category: "Black", difficulty: "Expert",
+      family: "Catalan",
+      description: "The ...a6 Variation (1.d4 Nf6 2.c4 e6 3.g3 d5 4.Bg2 a6) is a modern approach. Black delays commitment and prepares queenside expansion with ...b5.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "c2", to: "c4", comment: "Queen's Gambit" },
+        { from: "e7", to: "e6", comment: "Prepares d5" },
+        { from: "g2", to: "g3", comment: "Catalan setup" },
+        { from: "d7", to: "d5", comment: "Black claims the center" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop" },
+        { from: "a7", to: "a6", comment: "Modern ...a6 — prepares b5" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "b7", to: "b5", comment: "Black expands on the queenside" },
+        { from: "c4", to: "d5", comment: "White trades to open the position" },
+        { from: "e6", to: "d5", comment: "Black recaptures" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "c8", to: "b7", comment: "Black develops the bishop" },
+        { from: "b1", to: "c3", comment: "White develops" }
+      ] },
+    { name: "Dutch Defense (Leningrad Variation)", category: "Black", difficulty: "Expert",
+      family: "Dutch Defense",
+      description: "The Leningrad Dutch (1.d4 f5 2.g3 Nf6 3.Bg2 g6) fianchettoes the king's bishop. An aggressive setup that prepares a kingside attack. Played by world champions from Botvinnik to Nakamura.",
+      moves: [
+        { from: "d2", to: "d4", comment: "White claims the center" },
+        { from: "f7", to: "f5", comment: "Dutch Defense" },
+        { from: "g2", to: "g3", comment: "White's flexible response" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop" },
+        { from: "g7", to: "g6", comment: "Leningrad! Black fianchettoes too" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop on g7" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "c2", to: "c4", comment: "White gains queenside space" },
+        { from: "d7", to: "d6", comment: "Black supports ...e5" },
+        { from: "b1", to: "c3", comment: "White develops" },
+        { from: "e7", to: "e5", comment: "Black strikes in the center!" }
+      ] },
+    { name: "Dutch Defense (Classical Variation)", category: "Black", difficulty: "Intermediate",
+      family: "Dutch Defense",
+      description: "The Classical Dutch (1.d4 f5 2.c4 Nf6 3.g3 e6 4.Bg2 Be7) is the most solid Dutch setup. Black keeps the center flexible and waits for the right moment to attack.",
+      moves: [
+        { from: "d2", to: "d4", comment: "White claims the center" },
+        { from: "f7", to: "f5", comment: "Dutch Defense" },
+        { from: "c2", to: "c4", comment: "White reinforces" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "g2", to: "g3", comment: "Preparing the fianchetto" },
+        { from: "e7", to: "e6", comment: "Classical Dutch" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop" },
+        { from: "f8", to: "e7", comment: "Black develops quietly" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "d7", to: "d6", comment: "Black supports ...e5" },
+        { from: "b1", to: "c3", comment: "White develops" },
+        { from: "d8", to: "e8", comment: "Queen prepares to support ...e5" }
+      ] },
+    { name: "Dutch Defense (with ...a6)", category: "Black", difficulty: "Intermediate",
+      family: "Dutch Defense",
+      description: "The ...a6 Dutch (1.d4 f5 2.c4 Nf6 3.g3 e6 4.Bg2 Be7 5.O-O O-O 6.b3 a6) is a modern setup. Black prepares queenside expansion with ...b5 before committing to a central plan.",
+      moves: [
+        { from: "d2", to: "d4", comment: "White claims the center" },
+        { from: "f7", to: "f5", comment: "Dutch Defense" },
+        { from: "c2", to: "c4", comment: "White reinforces" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "g2", to: "g3", comment: "Preparing the fianchetto" },
+        { from: "e7", to: "e6", comment: "Classical setup" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop" },
+        { from: "f8", to: "e7", comment: "Black develops" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "a7", to: "a6", comment: "Modern ...a6 — prepares queenside expansion" },
+        { from: "b2", to: "b3", comment: "White prepares Bb2" },
+        { from: "b7", to: "b5", comment: "Black expands on the queenside" }
+      ] },
+    { name: "Colle-Koltanowski System", category: "White", difficulty: "Beginner",
+      family: "London / Colle",
+      description: "The Colle-Koltanowski System delays c4 and builds a slow kingside attack with e4-e5. A simple, reliable system for club players.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center" },
+        { from: "d7", to: "d5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop the knight" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "e2", to: "e3", comment: "Colle setup" },
+        { from: "e7", to: "e6", comment: "Black solidifies" },
+        { from: "f1", to: "d3", comment: "Bishop to the key diagonal" },
+        { from: "c7", to: "c5", comment: "Black challenges" },
+        { from: "c2", to: "c3", comment: "Support d4" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "b1", to: "d2", comment: "Classic Colle setup" },
+        { from: "f8", to: "d6", comment: "Black develops" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "e3", to: "e4", comment: "Koltanowski! White attacks" },
+        { from: "d5", to: "e4", comment: "Black captures" },
+        { from: "d3", to: "e4", comment: "Bishop recaptures actively" }
+      ] },
+    { name: "Barry Attack", category: "White", difficulty: "Intermediate",
+      family: "London / Colle",
+      description: "The Barry Attack (1.d4 Nf6 2.Nf3 g6 3.Nc3 d5 4.Bf4) is a London hybrid with Nc3. White launches a direct kingside attack with Bh6 and Qd2.",
+      moves: [
+        { from: "d2", to: "d4", comment: "Control the center" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "g1", to: "f3", comment: "White develops" },
+        { from: "g7", to: "g6", comment: "Black fianchettoes" },
+        { from: "b1", to: "c3", comment: "Barry Attack — London with Nc3" },
+        { from: "f8", to: "g7", comment: "Fianchettoed bishop" },
+        { from: "c1", to: "f4", comment: "London-style bishop" },
+        { from: "d7", to: "d5", comment: "Black claims the center" },
+        { from: "d1", to: "d2", comment: "Queen supports the bishop" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "c1", to: "h6", comment: "Attack the fianchettoed bishop!" },
+        { from: "g7", to: "h6", comment: "Black trades, weakening the kingside" },
+        { from: "d2", to: "h6", comment: "Queen recaptures — attacking chances" }
+      ] },
+    { name: "English Opening (Four Knights Variation)", category: "White", difficulty: "Intermediate",
+      family: "Flank Openings",
+      description: "The English Four Knights (1.c4 e5 2.Nc3 Nc6 3.Nf3 Nf6) is a symmetrical, flexible opening. Both sides develop naturally in this classic flank opening.",
+      moves: [
+        { from: "c2", to: "c4", comment: "English Opening" },
+        { from: "e7", to: "e5", comment: "Black claims the center" },
+        { from: "b1", to: "c3", comment: "Develop the knight" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "g1", to: "f3", comment: "Four Knights approach" },
+        { from: "g8", to: "f6", comment: "Four knights on the board" },
+        { from: "e2", to: "e3", comment: "Prepares d4" },
+        { from: "f8", to: "b4", comment: "Black pins the knight" },
+        { from: "d1", to: "c2", comment: "Breaks the pin" },
+        { from: "e8", to: "g8", comment: "Black castles" },
+        { from: "f1", to: "e2", comment: "White develops" },
+        { from: "d7", to: "d6", comment: "Black supports e5" },
+        { from: "d2", to: "d4", comment: "White opens the center" }
+      ] },
+    { name: "King's Indian Attack", category: "White", difficulty: "Beginner",
+      family: "Flank Openings",
+      description: "The King's Indian Attack (1.Nf3 d5 2.g3 Nf6 3.Bg2 c6) is a universal system. White plays a KID setup in reverse, easy to learn and playable against any Black defense.",
+      moves: [
+        { from: "g1", to: "f3", comment: "KIA — flexible development" },
+        { from: "d7", to: "d5", comment: "Black claims the center" },
+        { from: "g2", to: "g3", comment: "Preparing the fianchetto" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "f1", to: "g2", comment: "Fianchettoed bishop" },
+        { from: "c7", to: "c6", comment: "Black supports d5" },
+        { from: "e1", to: "g1", comment: "White castles" },
+        { from: "c8", to: "g4", comment: "Black pins the knight" },
+        { from: "h2", to: "h3", comment: "What does the bishop intend?" },
+        { from: "g4", to: "f3", comment: "Bishop trades for knight" },
+        { from: "g2", to: "f3", comment: "Bishop recaptures — long diagonal" },
+        { from: "b8", to: "d7", comment: "Black develops" },
+        { from: "d2", to: "d3", comment: "Prepares e4" },
+        { from: "e7", to: "e6", comment: "Black solidifies" },
+        { from: "e2", to: "e4", comment: "The KIA's central break!" }
+      ] },
+    { name: "G\u00f6ring Gambit", category: "White", difficulty: "Intermediate",
+      family: "Other Open Games",
+      description: "The G\u00f6ring Gambit (1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.c3) sacrifices a pawn for rapid development. A sharp club-level weapon similar to the Danish Gambit.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "g1", to: "f3", comment: "Develop the knight" },
+        { from: "b8", to: "c6", comment: "Black develops" },
+        { from: "d2", to: "d4", comment: "Open the center" },
+        { from: "e5", to: "d4", comment: "Black captures" },
+        { from: "c2", to: "c3", comment: "G\u00f6ring Gambit!" },
+        { from: "d4", to: "c3", comment: "Black accepts" },
+        { from: "f1", to: "c4", comment: "Develop with a threat on f7" },
+        { from: "c3", to: "b2", comment: "Black takes a second pawn" },
+        { from: "c1", to: "b2", comment: "Massive development lead for White" },
+        { from: "d8", to: "e7", comment: "Black defends f7" },
+        { from: "b1", to: "c3", comment: "White develops with tempo" },
+        { from: "g8", to: "f6", comment: "Black develops" },
+        { from: "e1", to: "g1", comment: "White castles" }
+      ] },
+    { name: "Center Game", category: "White", difficulty: "Beginner",
+      family: "Other Open Games",
+      description: "The Center Game (1.e4 e5 2.d4 exd4 3.Qxd4) brings the queen out early. Teaches important lessons about queen safety and development over material.",
+      moves: [
+        { from: "e2", to: "e4", comment: "Control the center" },
+        { from: "e7", to: "e5", comment: "Black mirrors" },
+        { from: "d2", to: "d4", comment: "Open the center" },
+        { from: "e5", to: "d4", comment: "Black captures" },
+        { from: "d1", to: "d4", comment: "Center Game — queen comes out early" },
+        { from: "b8", to: "c6", comment: "Black develops with tempo" },
+        { from: "d4", to: "e3", comment: "Queen retreats" },
+        { from: "g8", to: "f6", comment: "Black develops, attacks e4" },
+        { from: "b1", to: "c3", comment: "White defends e4" },
+        { from: "f8", to: "b4", comment: "Black pins the knight" },
+        { from: "f1", to: "d3", comment: "White develops" },
+        { from: "d7", to: "d5", comment: "Black opens the center" },
+        { from: "e4", to: "d5", comment: "White trades" },
+        { from: "f6", to: "d5", comment: "Knight recaptures with tempo" },
+        { from: "e3", to: "e2", comment: "Queen retreats again — Black is better developed" }
+      ] }
+];
+
+// ============ SCREEN STATE ============
+let currentScreen = 'menu';
+let selRow = -1;
+let selCol = -1;
+let gameStatus = '';
+let whiteClock = 0;
+let blackClock = 0;
+let lessonIndex = -1;
+let lessonMove = 0;
+let categoryFilter = '';
+let familyFilter = '';
+
+// ============ AI STATE ============
+let gameMode = 'free'; // 'free' | 'ai' | 'tournament'
+let playerSide = true; // true = human White, false = human Black
+// Game clock (milliseconds)
+let whiteClock = 0, blackClock = 0, lastMoveTimestamp = 0;
+function ResetClock() { whiteClock = 0; blackClock = 0; lastMoveTimestamp = performance.now(); }
+function UpdateClock(toWhite) {
+    let now = performance.now();
+    if (toWhite) whiteClock += now - lastMoveTimestamp; else blackClock += now - lastMoveTimestamp;
+    lastMoveTimestamp = now;
+}
+const PIECE_VALS = { 'P': 100, 'N': 320, 'B': 330, 'R': 500, 'Q': 900, 'K': 20000 };
+
+const STRENGTHS = [
+    { name: 'Novice', depth: 2, bookChance: 0, randomChance: 0.5, quiescence: false },
+    { name: 'Intermediate', depth: 3, bookChance: 0.5, randomChance: 0.2, quiescence: false },
+    { name: 'Competitor', depth: 4, bookChance: 0.8, randomChance: 0, quiescence: false },
+    { name: 'Master', depth: 5, bookChance: 0.9, randomChance: 0, quiescence: true },
+    { name: 'Grandmaster', depth: 6, bookChance: 1.0, randomChance: 0, quiescence: true }
+];
+
+const PERSONAS = [
+    { name: 'Novice', desc: 'Makes random moves — good for absolute beginners',
+      wMaterial: 1.0, wPST: 0.5, wKing: 0.5, wPawn: 0.5, preferredFamilies: [] },
+    { name: 'Defender', desc: 'Prioritizes king safety and solid pawn structure',
+      wMaterial: 1.0, wPST: 1.0, wKing: 2.0, wPawn: 1.5,
+      preferredFamilies: ['Caro-Kann', 'French Defense', "Queen's Gambit", 'Pirc / Modern', 'Indian Defenses', 'Ruy Lopez'] },
+    { name: 'Conservative', desc: 'Balanced, positional player who avoids risk',
+      wMaterial: 1.0, wPST: 1.3, wKing: 1.5, wPawn: 1.3,
+      preferredFamilies: ['London / Colle', "Queen's Gambit", 'Catalan', 'Ruy Lopez', 'Scotch / Four Knights'] },
+    { name: 'Flanker', desc: 'Loves wing play, fianchettoes, and flank attacks',
+      wMaterial: 1.0, wPST: 0.7, wKing: 1.0, wPawn: 1.0,
+      preferredFamilies: ['Flank Openings', 'Pirc / Modern', 'Sicilian Defense', 'Indian Defenses', 'Catalan'] },
+    { name: 'Reckless', desc: 'Gambler — sacrifices material for attack and initiative',
+      wMaterial: 0.6, wPST: 1.5, wKing: 0.5, wPawn: 0.5,
+      preferredFamilies: ["King's Gambit", 'Italian Game', 'Other Open Games', 'Sicilian Defense', 'Alekhine Defense'] },
+    { name: 'Attacker', desc: 'Relentless king-hunter — maximum aggression',
+      wMaterial: 0.8, wPST: 1.5, wKing: 0.5, wPawn: 0.7,
+      preferredFamilies: ['Italian Game', "King's Gambit", 'Sicilian Defense', 'Scotch / Four Knights', 'Other Open Games'] }
+];
+
+const MODIFIER_NAMES = ['Static', 'Fluid', 'Fluent'];
+
+let openingBook = null;
+let strengthLevel = 2;     // 0=Novice..4=Grandmaster, 5=Random
+let selectedPersona = 0;   // 0=Novice..5=Attacker
+let modifier = 0;          // 0=Static, 1=Fluid, 2=Fluent
+
+function randomizeAll() {
+    let r = Math.random() * 100;
+    if (r < 10) strengthLevel = 0;
+    else if (r < 40) strengthLevel = 1;
+    else if (r < 70) strengthLevel = 2;
+    else if (r < 90) strengthLevel = 3;
+    else strengthLevel = 4;
+    selectedPersona = Math.floor(Math.random() * 6);
+    modifier = Math.floor(Math.random() * 3);
+}
+
+// Tournament
+let tournamentActive = false;
+let tournamentSize = 16;
+let tournPlayers = [];
+let tournMatches = [];
+let tournHumanIdx = -1;
+let tournCurrentMatch = -1;
+let tournHumanWins = 0, tournHumanLosses = 0;
+
+// Fluent: drifting blend weights for the 6 base personas
+let fluentWeights = [1/6, 1/6, 1/6, 1/6, 1/6, 1/6];
+
+function DriftFluentWeights() {
+    for (let i = 0; i < 6; i++) {
+        fluentWeights[i] += (Math.random() - 0.5) * 0.06;
+        if (fluentWeights[i] < 0.02) fluentWeights[i] = 0.02;
+    }
+    let sum = fluentWeights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < 6; i++) fluentWeights[i] /= sum;
+}
+
+function SelectFluidPersona() {
+    let side = !playerSide;
+    let wMat = 0, bMat = 0;
+    let wkr = -1, wkc = -1, bkr = -1, bkc = -1;
+    let wPawnShield = 0, bPawnShield = 0;
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            let p = board[r][c];
+            if (p === '.') continue;
+            let v = PIECE_VALS[p.toUpperCase()] || 0;
+            if (IsWhitePiece(p)) wMat += v; else bMat += v;
+            if (p === 'K') { wkr = r; wkc = c; }
+            if (p === 'k') { bkr = r; bkc = c; }
+        }
+    }
+    if (wkr > 0) {
+        for (let d = -1; d <= 1; d++) {
+            let pc = wkc + d;
+            if (pc >= 0 && pc < 8 && board[wkr-1][pc] === 'P') wPawnShield++;
+        }
+    }
+    if (bkr < 7) {
+        for (let d = -1; d <= 1; d++) {
+            let pc = bkc + d;
+            if (pc >= 0 && pc < 8 && board[bkr+1][pc] === 'p') bPawnShield++;
+        }
+    }
+    let pieceCount = 0;
+    for (let r = 0; r < 8; r++)
+        for (let c = 0; c < 8; c++) {
+            let p = board[r][c];
+            if (p !== '.' && p !== 'P' && p !== 'p' && p !== 'K' && p !== 'k') pieceCount++;
+        }
+    let openFiles = 0;
+    for (let c = 0; c < 8; c++) {
+        let hasPawn = false;
+        for (let r = 0; r < 8; r++) if (board[r][c] === 'P' || board[r][c] === 'p') hasPawn = true;
+        if (!hasPawn) openFiles++;
+    }
+    let matDiff = side ? wMat - bMat : bMat - wMat;
+    let ownShield = side ? wPawnShield : bPawnShield;
+    let oppShield = side ? bPawnShield : wPawnShield;
+    // Losing material -> counter-attack
+    if (matDiff < -300) return oppShield < 2 ? 5 : 4;
+    // Winning material -> consolidate
+    if (matDiff > 300) return 1;
+    // Own king exposed
+    if (ownShield < 2) return 1;
+    // Opponent king exposed
+    if (oppShield < 2) return 5;
+    // Endgame
+    if (pieceCount <= 6) return 2;
+    // Open position
+    if (openFiles >= 3) return 4;
+    // Closed/flank position
+    return 3;
+}
+
+// Piece-square tables (row 0=rank8 .. row 7=rank1, from white's perspective)
+const PST_P = [
+    [ 0, 0, 0, 0, 0, 0, 0, 0],
+    [50,50,50,50,50,50,50,50],
+    [10,10,20,30,30,20,10,10],
+    [ 5, 5,10,27,27,10, 5, 5],
+    [ 0, 0, 0,25,25, 0, 0, 0],
+    [ 5,-5,-10, 0, 0,-10,-5, 5],
+    [ 5,10,10,-25,-25,10,10, 5],
+    [ 0, 0, 0, 0, 0, 0, 0, 0]
+];
+const PST_N = [
+    [-50,-40,-30,-30,-30,-30,-40,-50],
+    [-40,-20,  0,  0,  0,  0,-20,-40],
+    [-30,  0, 10, 15, 15, 10,  0,-30],
+    [-30,  5, 15, 20, 20, 15,  5,-30],
+    [-30,  0, 15, 20, 20, 15,  0,-30],
+    [-30,  5, 10, 15, 15, 10,  5,-30],
+    [-40,-20,  0,  5,  5,  0,-20,-40],
+    [-50,-40,-30,-30,-30,-30,-40,-50]
+];
+const PST_B = [
+    [-20,-10,-10,-10,-10,-10,-10,-20],
+    [-10,  0,  0,  0,  0,  0,  0,-10],
+    [-10,  0, 10, 10, 10, 10,  0,-10],
+    [-10,  5,  5, 10, 10,  5,  5,-10],
+    [-10,  0, 10, 10, 10, 10,  0,-10],
+    [-10, 10, 10, 10, 10, 10, 10,-10],
+    [-10,  5,  0,  0,  0,  0,  5,-10],
+    [-20,-10,-10,-10,-10,-10,-10,-20]
+];
+const PST_R = [
+    [ 0, 0, 0, 0, 0, 0, 0, 0],
+    [ 5,10,10,10,10,10,10, 5],
+    [-5, 0, 0, 0, 0, 0, 0,-5],
+    [-5, 0, 0, 0, 0, 0, 0,-5],
+    [-5, 0, 0, 0, 0, 0, 0,-5],
+    [-5, 0, 0, 0, 0, 0, 0,-5],
+    [-5, 0, 0, 0, 0, 0, 0,-5],
+    [ 0, 0, 0, 5, 5, 0, 0, 0]
+];
+const PST_Q = [
+    [-20,-10,-10, -5, -5,-10,-10,-20],
+    [-10,  0,  5,  0,  0,  0,  0,-10],
+    [-10,  5,  5,  5,  5,  5,  0,-10],
+    [ -5,  0,  5,  5,  5,  5,  0, -5],
+    [  0,  0,  5,  5,  5,  5,  0, -5],
+    [-10,  0,  5,  5,  5,  5,  0,-10],
+    [-10,  0,  0,  0,  0,  0,  0,-10],
+    [-20,-10,-10, -5, -5,-10,-10,-20]
+];
+const PST_K = [
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-20,-30,-30,-40,-40,-30,-30,-20],
+    [-10,-20,-20,-20,-20,-20,-20,-10],
+    [ 20, 20,  0,  0,  0,  0, 20, 20],
+    [ 20, 30, 10,  0,  0, 10, 30, 20]
+];
+
+// ============ RENDER FUNCTIONS ============
+function RenderBoardHTML(containerId, selR, selC) {
+    let validMoves = [];
+    if (selR !== -1 && selC !== -1) {
+        validMoves = GetValidMoves(selR, selC);
+    }
+    let html = '<div id="board-wrap"><div id="board">';
+    for (let r = 0; r < 8; r++) {
+        html += `<div class="label-r">${8 - r}</div>`;
+        for (let c = 0; c < 8; c++) {
+            let light = (r + c) % 2 === 0;
+            let sel = (r === selR && c === selC) ? ' sel' : '';
+            let piece = board[r][c];
+            let ch = piece !== '.' ? GetPieceChar(piece) : '';
+            let pc = piece !== '.' ? (IsWhitePiece(piece) ? '#e8e8e8' : '#2a2a2a') : '';
+            let style = pc ? ` style="color:${pc}"` : '';
+            let vmClass = '';
+            if (selR !== -1 && validMoves.some(m => m.r === r && m.c === c)) {
+                vmClass = piece !== '.' ? ' vm-capture' : ' vm';
+            }
+            let wpClass = piece !== '.' && IsWhitePiece(piece) ? ' wp' : '';
+            html += `<div class="sq ${light ? 'light' : 'dark'}${sel}${vmClass}${wpClass}" data-r="${r}" data-c="${c}"${style}>${ch}</div>`;
+        }
+    }
+    for (let c = 0; c < 8; c++) {
+        let label = c === 0 ? '<div class="label-r" style="visibility:hidden"></div>' : '';
+        html += label + `<div class="label-f">${String.fromCharCode(97 + c)}</div>`;
+    }
+    html += '</div></div>';
+    document.getElementById(containerId).innerHTML = html;
+
+    // Attach click handler
+    document.querySelectorAll(`#${containerId} .sq`).forEach(el => {
+        el.addEventListener('click', function() {
+            let r = parseInt(this.dataset.r);
+            let c = parseInt(this.dataset.c);
+            OnSquareClick(r, c);
+        });
+    });
+}
+
+function ShowScreen(id) {
+    document.querySelectorAll('#app > div').forEach(d => d.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    currentScreen = id.replace('screen-', '');
+}
+
+function QuitApp() {
+    document.getElementById('app').innerHTML = '<p style="color:#888;font-size:20px;margin-top:100px">Thanks for playing!</p>';
+}
+
+function UpdateHistoryDisplay() {
+    let el = document.getElementById('history-wrap');
+    if (!el) return;
+    if (moveHistory.length === 0) {
+        el.textContent = '';
+        return;
+    }
+    let lines = [];
+    for (let i = 0; i < moveHistory.length; i += 2) {
+        let num = Math.floor(i / 2) + 1;
+        let w = moveHistory[i] || '';
+        let b = (i + 1 < moveHistory.length) ? moveHistory[i + 1] : '';
+        lines.push(num + '. ' + w + (b ? ' ' + b : ''));
+    }
+    el.textContent = lines.join('  ');
+    el.scrollTop = el.scrollHeight;
+}
+
+function UndoLastMove() {
+    if (isMultiplayer) return;
+    if (gameMode === 'ai') {
+        if (UndoMove()) UndoMove(); // undo AI + human
+    } else {
+        UndoMove(); // undo 1 move in free/local MP
+    }
+    selRow = selCol = -1;
+    gameStatus = whiteTurn ? "White's turn" : "Black's turn";
+    if (IsInCheck(whiteTurn)) gameStatus += '  Check!';
+    RenderBoardHTML('board-wrap', selRow, selCol);
+    document.getElementById('status').textContent = gameStatus;
+    UpdateHistoryDisplay();
+    UpdateClockDisplay();
+}
+
+function ExportPGNFromUI() {
+    let pgn = ExportPGN();
+    let blob = new Blob([pgn], { type: 'text/plain' });
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chess_game.pgn';
+    a.click();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pgn);
+    }
+    // iOS fallback: show PGN in a prompt
+    if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+        let textarea = document.createElement('textarea');
+        textarea.value = pgn;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try { document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(textarea);
+        gameStatus = 'PGN copied to clipboard';
+        if (currentScreen === 'play') document.getElementById('status').textContent = gameStatus;
+    }
+}
+
+// ============ PLAY SCREEN ============
+function StartLocalMP() {
+    gameMode = 'free';
+    InitializeBoard();
+    selRow = selCol = -1;
+    whiteClock = 0;
+    blackClock = 0;
+    ResetClock(true);
+    gameStatus = "White's turn";
+    document.getElementById('screen-play-title').textContent = 'Local MP';
+    ShowScreen('screen-play');
+    RenderBoardHTML('board-wrap', selRow, selCol);
+    document.getElementById('status').textContent = gameStatus;
+    UpdateHistoryDisplay();
+    UpdateClockDisplay();
+}
+
+function OnSquareClick(row, col) {
+    if (currentScreen === 'play') {
+        if (gameMode === 'ai' && whiteTurn !== playerSide) return;
+        if (selRow === -1) {
+            let p = board[row][col];
+            if (p !== '.' && IsWhitePiece(p) === whiteTurn) {
+                selRow = row; selCol = col;
+                gameStatus = (whiteTurn ? "White" : "Black") + ": " + GetPieceChar(p) + " selected";
+                RenderBoardHTML('board-wrap', selRow, selCol);
+                document.getElementById('status').textContent = gameStatus;
+            }
+        } else {
+            let from = String.fromCharCode(97 + selCol) + String.fromCharCode(48 + (8 - selRow));
+            let to = String.fromCharCode(97 + col) + String.fromCharCode(48 + (8 - row));
+            if (MovePiece(from, to)) {
+                if (isMultiplayer && conn && conn.open) {
+                    conn.send({ type: 'move', from: from, to: to });
+                }
+                let inCheck = IsInCheck(whiteTurn);
+                gameStatus = whiteTurn ? "White's turn" : "Black's turn";
+                if (inCheck) gameStatus += '  Check!';
+                if (gameMode === 'ai' && whiteTurn !== playerSide) {
+                    gameStatus = 'AI thinking...';
+                    selRow = selCol = -1;
+                    RenderBoardHTML('board-wrap', selRow, selCol);
+                    document.getElementById('status').textContent = gameStatus;
+                    UpdateHistoryDisplay();
+                    setTimeout(AIThinkAndMove, 300);
+                    return;
+                }
+            } else {
+                gameStatus = "Invalid move";
+            }
+            selRow = selCol = -1;
+            RenderBoardHTML('board-wrap', selRow, selCol);
+            document.getElementById('status').textContent = gameStatus;
+            UpdateHistoryDisplay();
+            UpdateClockDisplay();
+        }
+    }
+}
+
+// ============ AI: HELPERS ============
+function GetPST(p, r, c) {
+    if (p === 'P') return PST_P[r][c]; if (p === 'p') return -PST_P[7-r][7-c];
+    if (p === 'N') return PST_N[r][c]; if (p === 'n') return -PST_N[7-r][7-c];
+    if (p === 'B') return PST_B[r][c]; if (p === 'b') return -PST_B[7-r][7-c];
+    if (p === 'R') return PST_R[r][c]; if (p === 'r') return -PST_R[7-r][7-c];
+    if (p === 'Q') return PST_Q[r][c]; if (p === 'q') return -PST_Q[7-r][7-c];
+    if (p === 'K') return PST_K[r][c]; if (p === 'k') return -PST_K[7-r][7-c];
+    return 0;
+}
+
+function BoardFingerprint() {
+    return board.map(r => r.join('')).join('/');
+}
+
+function BuildOpeningBook() {
+    let book = {};
+    for (let lesson of teachingGames) {
+        InitializeBoard();
+        moveHistory = [];
+        boardHistory = [];
+        whiteTurn = true;
+        kingMoved = [false, false];
+        rookMoved = [[false, false], [false, false]];
+        enPassantRow = enPassantCol = -1;
+        for (let i = 0; i < lesson.moves.length - 1; i++) {
+            MovePiece(lesson.moves[i].from, lesson.moves[i].to);
+            let fp = BoardFingerprint();
+            let next = lesson.moves[i + 1];
+            if (!book[fp]) book[fp] = [];
+            book[fp].push({ from: next.from, to: next.to, family: lesson.family });
+        }
+    }
+    InitializeBoard();
+    moveHistory = [];
+    boardHistory = [];
+    return book;
+}
+
+function EnsureOpeningBook() {
+    if (!openingBook) openingBook = BuildOpeningBook();
+}
+
+function LookupBookMove() {
+    EnsureOpeningBook();
+    let fp = BoardFingerprint();
+    let entries = openingBook[fp];
+    if (!entries || entries.length === 0) return null;
+    return entries[Math.floor(Math.random() * entries.length)];
+}
+
+function EvaluatePawnStructure() {
+    let score = 0;
+    for (let c = 0; c < 8; c++) {
+        let wc = 0, bc = 0;
+        for (let r = 0; r < 8; r++) {
+            if (board[r][c] === 'P') wc++;
+            if (board[r][c] === 'p') bc++;
+        }
+        if (wc > 1) score -= 15 * (wc - 1);
+        if (bc > 1) score += 15 * (bc - 1);
+    }
+    for (let c = 0; c < 8; c++) {
+        let left = c > 0, right = c < 7;
+        let wNbr = false, bNbr = false;
+        for (let nc = (left ? c - 1 : 10); nc <= (right ? c + 1 : 10); nc += (nc === 10 ? 0 : 1) ? 0 : 0) {
+            // simplified neighbor check
+        }
+        for (let nc of (left ? [c - 1] : []).concat(right ? [c + 1] : [])) {
+            for (let r = 0; r < 8; r++) {
+                if (board[r][nc] === 'P') wNbr = true;
+                if (board[r][nc] === 'p') bNbr = true;
+            }
+        }
+        if (!wNbr) for (let r = 0; r < 8; r++) if (board[r][c] === 'P') score -= 20;
+        if (!bNbr) for (let r = 0; r < 8; r++) if (board[r][c] === 'p') score += 20;
+    }
+    return score;
+}
+
+// ============ AI: EVALUATION ============
+function ComputeEvalComponents() {
+    let material = 0, pst = 0, kingSafety = 0;
+    let wkr = -1, wkc = -1, bkr = -1, bkc = -1;
+
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            let p = board[r][c];
+            if (p === '.') continue;
+            let sign = IsWhitePiece(p) ? 1 : -1;
+            material += sign * (PIECE_VALS[p.toUpperCase()] || 0);
+            pst += sign * GetPST(p, r, c);
+            if (p === 'K') { wkr = r; wkc = c; }
+            if (p === 'k') { bkr = r; bkc = c; }
+        }
+    }
+
+    function knightGuardCount(kr, kc, forWhite) {
+        const kdr = [-2,-1,1,2,2,1,-1,-2], kdc = [1,2,2,1,-1,-2,-2,-1];
+        let count = 0;
+        for (let d = 0; d < 8; d++) {
+            let nr = kr + kdr[d], nc = kc + kdc[d];
+            if (nr < 0 || nr > 7 || nc < 0 || nc > 7) continue;
+            let p = board[nr][nc];
+            if ((forWhite && p === 'N') || (!forWhite && p === 'n')) count++;
+        }
+        return count;
+    }
+    function backupKnights(kr, kc, forWhite) {
+        const kdr = [-2,-1,1,2,2,1,-1,-2], kdc = [1,2,2,1,-1,-2,-2,-1];
+        let covered = Array.from({length:8},()=>Array(8).fill(false));
+        for (let dr = -1; dr <= 1; dr++)
+            for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                let nr = kr + dr, nc = kc + dc;
+                if (nr < 0 || nr > 7 || nc < 0 || nc > 7) continue;
+                for (let d = 0; d < 8; d++) {
+                    let nnr = nr + kdr[d], nnc = nc + kdc[d];
+                    if (nnr < 0 || nnr > 7 || nnc < 0 || nnc > 7) continue;
+                    covered[nnr][nnc] = true;
+                }
+            }
+        let count = 0;
+        for (let r = 0; r < 8; r++)
+            for (let c = 0; c < 8; c++)
+                if (covered[r][c] && ((forWhite && board[r][c] === 'N') || (!forWhite && board[r][c] === 'n'))) count++;
+        return count;
+    }
+
+    if (wkr >= 0) {
+        if (wkc >= 6 && wkr >= 6) kingSafety += 30;
+        else if (wkc <= 1 && wkr >= 6) kingSafety += 20;
+        let shield = 0;
+        if (wkr > 0)
+            for (let d = -1; d <= 1; d++) {
+                let pc = wkc + d;
+                if (pc >= 0 && pc < 8 && board[wkr - 1][pc] === 'P') { kingSafety += 10; shield++; }
+            }
+        let kg = knightGuardCount(wkr, wkc, true);
+        if (kg > 0) kingSafety += 15 * Math.min(kg, 2);
+        let bk = backupKnights(wkr, wkc, true);
+        if (bk > 0) kingSafety += 10 * Math.min(bk, 2);
+        if (shield === 3 && kg >= 1 && bk >= 1) kingSafety += 20;
+    }
+    if (bkr >= 0) {
+        if (bkc >= 6 && bkr <= 1) kingSafety -= 30;
+        else if (bkc <= 1 && bkr <= 1) kingSafety -= 40;
+        let shield = 0;
+        if (bkr < 7)
+            for (let d = -1; d <= 1; d++) {
+                let pc = bkc + d;
+                if (pc >= 0 && pc < 8 && board[bkr + 1][pc] === 'p') { kingSafety -= 10; shield++; }
+            }
+        let kg = knightGuardCount(bkr, bkc, false);
+        if (kg > 0) kingSafety -= 15 * Math.min(kg, 2);
+        let bk = backupKnights(bkr, bkc, false);
+        if (bk > 0) kingSafety -= 10 * Math.min(bk, 2);
+        if (shield === 3 && kg >= 1 && bk >= 1) kingSafety -= 20;
+    }
+
+    let pawnStruct = EvaluatePawnStructure();
+    return { material, pst, kingSafety, pawnStruct };
+}
+
+function AIEvaluate() {
+    if (modifier === 2) return GetBlendedEval();
+    let pw = PERSONAS[selectedPersona];
+    let c = ComputeEvalComponents();
+    return c.material * pw.wMaterial + c.pst * pw.wPST + c.kingSafety * pw.wKing + c.pawnStruct * pw.wPawn;
+}
+
+function GetBlendedEval() {
+    let c = ComputeEvalComponents();
+    let total = 0;
+    for (let i = 0; i < 6; i++) {
+        let pw = PERSONAS[i];
+        total += fluentWeights[i] * (c.material * pw.wMaterial + c.pst * pw.wPST + c.kingSafety * pw.wKing + c.pawnStruct * pw.wPawn);
+    }
+    return total;
+}
+
+// ============ AI: SEARCH ============
+function GenerateCaptures(forWhite) {
+    let caps = [];
+    for (let r = 0; r < 8; r++)
+        for (let c = 0; c < 8; c++) {
+            let p = board[r][c];
+            if (p === '.' || forWhite !== IsWhitePiece(p)) continue;
+            let targets = GetValidMoves(r, c);
+            for (let t of targets)
+                if (board[t.r][t.c] !== '.')
+                    caps.push({ fr: r, fc: c, tr: t.r, tc: t.c });
+        }
+    return caps;
+}
+
+function Quiescence(alpha, beta, isMaximizing) {
+    let standPat = AIEvaluate();
+    if (isMaximizing) {
+        if (standPat >= beta) return beta;
+        if (standPat > alpha) alpha = standPat;
+    } else {
+        if (standPat <= alpha) return alpha;
+        if (standPat < beta) beta = standPat;
+    }
+    let side = isMaximizing;
+    let caps = GenerateCaptures(side);
+    caps.sort((a, b) => {
+        let ca = PIECE_VALS[board[a.tr][a.tc].toUpperCase()] || 0;
+        let cb = PIECE_VALS[board[b.tr][b.tc].toUpperCase()] || 0;
+        return cb - ca;
+    });
+    for (let m of caps) {
+        let from = String.fromCharCode(97 + m.fc) + String.fromCharCode(48 + (8 - m.fr));
+        let to = String.fromCharCode(97 + m.tc) + String.fromCharCode(48 + (8 - m.tr));
+        if (!MovePiece(from, to)) continue;
+        let score = Quiescence(alpha, beta, !isMaximizing);
+        UndoMove();
+        if (isMaximizing) {
+            if (score >= beta) return beta;
+            if (score > alpha) alpha = score;
+        } else {
+            if (score <= alpha) return alpha;
+            if (score < beta) beta = score;
+        }
+    }
+    return isMaximizing ? alpha : beta;
+}
+
+function AISearch(depth, alpha, beta, isMaximizing) {
+    let pw = STRENGTHS[strengthLevel];
+    if (depth === 0) return pw.quiescence ? Quiescence(alpha, beta, isMaximizing) : AIEvaluate();
+    let side = isMaximizing;
+    let moves = GenerateAllMoves(side);
+    if (moves.length === 0) return isMaximizing ? -99999 : 99999;
+
+    moves.sort((a, b) => {
+        let ca = board[a.tr][a.tc] === '.' ? 0 : PIECE_VALS[board[a.tr][a.tc].toUpperCase()];
+        let cb = board[b.tr][b.tc] === '.' ? 0 : PIECE_VALS[board[b.tr][b.tc].toUpperCase()];
+        return cb - ca;
+    });
+
+    if (isMaximizing) {
+        let maxScore = -Infinity;
+        for (let m of moves) {
+            let from = String.fromCharCode(97 + m.fc) + String.fromCharCode(48 + (8 - m.fr));
+            let to = String.fromCharCode(97 + m.tc) + String.fromCharCode(48 + (8 - m.tr));
+            if (!MovePiece(from, to)) continue;
+            let score = AISearch(depth - 1, alpha, beta, false);
+            if (score > maxScore) maxScore = score;
+            if (score > alpha) alpha = score;
+            UndoMove();
+            if (alpha >= beta) break;
+        }
+        return maxScore;
+    } else {
+        let minScore = Infinity;
+        for (let m of moves) {
+            let from = String.fromCharCode(97 + m.fc) + String.fromCharCode(48 + (8 - m.fr));
+            let to = String.fromCharCode(97 + m.tc) + String.fromCharCode(48 + (8 - m.tr));
+            if (!MovePiece(from, to)) continue;
+            let score = AISearch(depth - 1, alpha, beta, true);
+            if (score < minScore) minScore = score;
+            if (score < beta) beta = score;
+            UndoMove();
+            if (alpha >= beta) break;
+        }
+        return minScore;
+    }
+}
+
+function GenerateAllMoves(forWhite) {
+    let moves = [];
+    for (let r = 0; r < 8; r++)
+        for (let c = 0; c < 8; c++) {
+            let p = board[r][c];
+            if (p === '.' || forWhite !== IsWhitePiece(p)) continue;
+            let targets = GetValidMoves(r, c);
+            for (let t of targets)
+                moves.push({ fr: r, fc: c, tr: t.r, tc: t.c });
+        }
+    return moves;
+}
+
+// ============ AI: THINK ============
+function AIThinkAndMove() {
+    if (gameMode !== 'ai') return;
+    if (playerSide === whiteTurn) return;
+
+    let savedPersona = selectedPersona;
+    // Fluid (1): select sub-persona for this move
+    if (modifier === 1) selectedPersona = SelectFluidPersona();
+    // Fluent (2): drift blend weights
+    if (modifier === 2) DriftFluentWeights();
+
+    let strength = STRENGTHS[strengthLevel];
+    let side = !playerSide;
+
+    // Opening book
+    if (Math.random() < strength.bookChance) {
+        let bookMove = LookupBookMove();
+        if (bookMove) {
+            MovePiece(bookMove.from, bookMove.to);
+            if (modifier === 1) selectedPersona = savedPersona;
+            FinishAIMove();
+            return;
+        }
+    }
+
+    let moves = GenerateAllMoves(side);
+    if (moves.length === 0) {
+        gameStatus = "AI has no legal moves";
+        document.getElementById('status').textContent = gameStatus;
+        if (modifier === 1) selectedPersona = savedPersona;
+        return;
+    }
+
+    if (Math.random() < strength.randomChance) {
+        let pick = moves[Math.floor(Math.random() * moves.length)];
+        let from = String.fromCharCode(97 + pick.fc) + String.fromCharCode(48 + (8 - pick.fr));
+        let to = String.fromCharCode(97 + pick.tc) + String.fromCharCode(48 + (8 - pick.tr));
+        MovePiece(from, to);
+    } else {
+        moves.sort((a, b) => {
+            let ca = board[a.tr][a.tc] === '.' ? 0 : PIECE_VALS[board[a.tr][a.tc].toUpperCase()];
+            let cb = board[b.tr][b.tc] === '.' ? 0 : PIECE_VALS[board[b.tr][b.tc].toUpperCase()];
+            return cb - ca;
+        });
+
+        let bestScore = side ? -Infinity : Infinity;
+        let bestIdx = 0;
+        for (let i = 0; i < moves.length; i++) {
+            let m = moves[i];
+            let from = String.fromCharCode(97 + m.fc) + String.fromCharCode(48 + (8 - m.fr));
+            let to = String.fromCharCode(97 + m.tc) + String.fromCharCode(48 + (8 - m.tr));
+            if (!MovePiece(from, to)) continue;
+            let score = AISearch(strength.depth, -Infinity, Infinity, side);
+            if (side ? (score > bestScore) : (score < bestScore)) {
+                bestScore = score;
+                bestIdx = i;
+            }
+            UndoMove();
+        }
+
+        let best = moves[bestIdx];
+        let from = String.fromCharCode(97 + best.fc) + String.fromCharCode(48 + (8 - best.fr));
+        let to = String.fromCharCode(97 + best.tc) + String.fromCharCode(48 + (8 - best.tr));
+        MovePiece(from, to);
+    }
+
+    if (modifier === 1) selectedPersona = savedPersona;
+    FinishAIMove();
+}
+
+// ============ TOURNAMENT ============
+function winProb(s1, s2) {
+    let d1 = 1 + s1 * 0.5, d2 = 1 + s2 * 0.5;
+    return d1 / (d1 + d2);
+}
+
+function InitTournament(n) {
+    tournamentSize = n;
+    tournamentActive = true;
+    tournPlayers = [];
+    tournMatches = [];
+    tournHumanWins = 0;
+    tournHumanLosses = 0;
+
+    for (let i = 0; i < n - 1; i++) {
+        let r = Math.random() * 100;
+        let s = r < 10 ? 0 : r < 40 ? 1 : r < 70 ? 2 : r < 90 ? 3 : 4;
+        tournPlayers.push({ name: 'AI ' + (i + 1), strengthIdx: s, personaIdx: Math.floor(Math.random() * 6), modifierIdx: Math.floor(Math.random() * 3), seed: 0, isHuman: false });
+    }
+    let r = Math.random() * 100;
+    let hs = r < 10 ? 0 : r < 40 ? 1 : r < 70 ? 2 : r < 90 ? 3 : 4;
+    tournPlayers.push({ name: 'You', strengthIdx: hs, personaIdx: 0, modifierIdx: 0, seed: 0, isHuman: true });
+
+    tournPlayers.sort((a, b) => {
+        if (a.strengthIdx !== b.strengthIdx) return b.strengthIdx - a.strengthIdx;
+        if (a.isHuman !== b.isHuman) return a.isHuman ? -1 : 1;
+        return 0;
+    });
+    for (let i = 0; i < n; i++) tournPlayers[i].seed = i + 1;
+    tournHumanIdx = tournPlayers.findIndex(p => p.isHuman);
+
+    let matchId = 0;
+    let prevRound = [];
+
+    for (let i = 0; i < n; i += 2) {
+        tournMatches.push({ id: matchId, p1Idx: i, p2Idx: i + 1, winnerIdx: -1, time1: 0, time2: 0, played: false, isLoserMatch: false, nextMatchId: -1, nextLoserMatchId: -1 });
+        prevRound.push(matchId);
+        matchId++;
+    }
+
+    let mtr = n / 2;
+    while (mtr > 1) {
+        let nextRound = [];
+        for (let i = 0; i < mtr; i += 2) {
+            tournMatches.push({ id: matchId, p1Idx: -1, p2Idx: -1, winnerIdx: -1, time1: 0, time2: 0, played: false, isLoserMatch: false, nextMatchId: -1, nextLoserMatchId: -1 });
+            tournMatches[prevRound[i]].nextMatchId = matchId;
+            tournMatches[prevRound[i + 1]].nextMatchId = matchId;
+            nextRound.push(matchId);
+            matchId++;
+        }
+        prevRound = nextRound;
+        mtr /= 2;
+    }
+    let wbChamp = prevRound[0];
+
+    // Losers bracket
+    let lbPrevRound = [];
+    let lbSize = n / 4;
+    let wbRoundStart = n / 2;
+
+    // LB R1: losers from WB R1
+    for (let i = 0; i < lbSize; i++) {
+        tournMatches.push({ id: matchId, p1Idx: -1, p2Idx: -1, winnerIdx: -1, time1: 0, time2: 0, played: false, isLoserMatch: true, nextMatchId: -1, nextLoserMatchId: -1 });
+        tournMatches[i * 2].nextLoserMatchId = matchId;
+        tournMatches[i * 2 + 1].nextLoserMatchId = matchId;
+        lbPrevRound.push(matchId);
+        matchId++;
+    }
+
+    let wbRound = 1;
+    while (lbSize >= 1) {
+        let lbNextRound = [];
+        let wbLosersStart = 0;
+        for (let r = 0; r < wbRound; r++) wbLosersStart += n / Math.pow(2, r + 1);
+        let wbLosers = n / Math.pow(2, wbRound + 1);
+
+        // LB winners play each other
+        for (let i = 0; i < lbPrevRound.length; i += 2) {
+            if (i + 1 >= lbPrevRound.length) {
+                tournMatches.push({ id: matchId, p1Idx: -1, p2Idx: -1, winnerIdx: -1, time1: 0, time2: 0, played: false, isLoserMatch: true, nextMatchId: -1, nextLoserMatchId: -1 });
+                tournMatches[lbPrevRound[i]].nextMatchId = matchId;
+                lbNextRound.push(matchId);
+                matchId++;
+            } else {
+                tournMatches.push({ id: matchId, p1Idx: -1, p2Idx: -1, winnerIdx: -1, time1: 0, time2: 0, played: false, isLoserMatch: true, nextMatchId: -1, nextLoserMatchId: -1 });
+                tournMatches[lbPrevRound[i]].nextMatchId = matchId;
+                tournMatches[lbPrevRound[i + 1]].nextMatchId = matchId;
+                lbNextRound.push(matchId);
+                matchId++;
+            }
+        }
+
+        // Merge WB losers
+        if (wbLosers > 0 && wbRound < Math.log2(n) - 1) {
+            let mergeCount = Math.min(wbLosers, lbNextRound.length);
+            for (let i = 0; i < mergeCount; i++) {
+                let lbMidx = lbNextRound[i];
+                let wbMidx = wbLosersStart + i;
+                if (wbMidx < tournMatches.length) {
+                    tournMatches[wbMidx].nextLoserMatchId = lbMidx;
+                }
+            }
+        }
+
+        lbPrevRound = lbNextRound;
+        lbSize /= 2;
+        wbRound++;
+    }
+
+    // Grand final
+    tournMatches.push({ id: matchId, p1Idx: -1, p2Idx: -1, winnerIdx: -1, time1: 0, time2: 0, played: false, isLoserMatch: false, nextMatchId: -1, nextLoserMatchId: -1 });
+    tournMatches[wbChamp].nextMatchId = matchId;
+    if (lbPrevRound.length > 0) tournMatches[lbPrevRound[0]].nextMatchId = matchId;
+    matchId++;
+
+    // Grand final reset
+    tournMatches.push({ id: matchId, p1Idx: -1, p2Idx: -1, winnerIdx: -1, time1: 0, time2: 0, played: false, isLoserMatch: true, nextMatchId: -1, nextLoserMatchId: -1 });
+    tournMatches[matchId - 2].nextLoserMatchId = matchId;
+
+    tournCurrentMatch = -1;
+    ResolveAllAIMatches();
+    SaveTournament();
+}
+
+function ResolveAIMatch(mi) {
+    if (mi < 0 || mi >= tournMatches.length) return;
+    let m = tournMatches[mi];
+    if (m.played || m.p1Idx < 0 || m.p2Idx < 0) return;
+    let prob = winProb(tournPlayers[m.p1Idx].strengthIdx, tournPlayers[m.p2Idx].strengthIdx);
+    m.winnerIdx = Math.random() < prob ? m.p1Idx : m.p2Idx;
+    m.played = true;
+    AdvanceTournament(mi, m.winnerIdx);
+}
+
+function AdvanceTournament(mi, wi) {
+    if (mi < 0 || mi >= tournMatches.length) return;
+    let m = tournMatches[mi];
+    if (m.nextMatchId >= 0 && m.nextMatchId < tournMatches.length) {
+        let n = tournMatches[m.nextMatchId];
+        if (n.p1Idx < 0) n.p1Idx = wi;
+        else if (n.p2Idx < 0) n.p2Idx = wi;
+    }
+    if (m.nextLoserMatchId >= 0 && m.nextLoserMatchId < tournMatches.length) {
+        let li = m.p1Idx === wi ? m.p2Idx : m.p1Idx;
+        let n = tournMatches[m.nextLoserMatchId];
+        if (n.p1Idx < 0) n.p1Idx = li;
+        else if (n.p2Idx < 0) n.p2Idx = li;
+    }
+}
+
+function ResolveAllAIMatches() {
+    for (let m of tournMatches) {
+        if (m.played) continue;
+        if (m.p1Idx === tournHumanIdx || m.p2Idx === tournHumanIdx) continue;
+        if (m.p1Idx < 0 || m.p2Idx < 0) continue;
+        ResolveAIMatch(m.id);
+    }
+}
+
+function GetHumanMatch() {
+    return tournMatches.find(m => !m.played && (m.p1Idx === tournHumanIdx || m.p2Idx === tournHumanIdx) && m.p1Idx >= 0 && m.p2Idx >= 0);
+}
+
+function GetMatchResult(mi) {
+    let m = tournMatches[mi];
+    if (!m.played || m.winnerIdx < 0) return null;
+    return { winner: m.winnerIdx,
+        winnerIsHuman: m.winnerIdx === tournHumanIdx,
+        p1Won: m.winnerIdx === m.p1Idx,
+        time: m.time1 + m.time2 };
+}
+
+function SaveTournament() {
+    let data = { players: tournPlayers, matches: tournMatches.map(m => ({...m})),
+        size: tournamentSize, humanIdx: tournHumanIdx, wins: tournHumanWins, losses: tournHumanLosses };
+    try { localStorage.setItem('chessTournament', JSON.stringify(data)); } catch(e) {}
+}
+
+function LoadTournament() {
+    try {
+        let raw = localStorage.getItem('chessTournament');
+        if (!raw) return false;
+        let data = JSON.parse(raw);
+        tournamentSize = data.size;
+        tournPlayers = data.players;
+        tournMatches = data.matches;
+        tournHumanIdx = data.humanIdx;
+        tournHumanWins = data.wins;
+        tournHumanLosses = data.losses;
+        tournamentActive = true;
+        return true;
+    } catch(e) { return false; }
+}
+
+function ClearTournamentSave() {
+    try { localStorage.removeItem('chessTournament'); } catch(e) {}
+}
+
+function FinishAIMove() {
+    selRow = selCol = -1;
+    let inCheck = IsInCheck(whiteTurn);
+    gameStatus = whiteTurn ? "White's turn" : "Black's turn";
+    if (inCheck) gameStatus += '  Check!';
+    RenderBoardHTML('board-wrap', selRow, selCol);
+    document.getElementById('status').textContent = gameStatus;
+    UpdateHistoryDisplay();
+    UpdateClockDisplay();
+}
+
+function ShowAISetup() {
+    playerSide = true;
+    strengthLevel = 2;
+    selectedPersona = 0;
+    modifier = 0;
+    ShowScreen('screen-ai-setup');
+    UpdateAIUI();
+}
+
+function SetAISide(isWhite) {
+    playerSide = isWhite;
+    document.getElementById('ai-side-w').style.background = isWhite ? '#5a5a5a' : '#444';
+    document.getElementById('ai-side-w').style.fontWeight = isWhite ? 'bold' : 'normal';
+    document.getElementById('ai-side-b').style.background = isWhite ? '#444' : '#5a5a5a';
+    document.getElementById('ai-side-b').style.fontWeight = isWhite ? 'normal' : 'bold';
+}
+
+function SetStrength(idx) {
+    strengthLevel = idx;
+    for (let i = 0; i < 6; i++) {
+        let el = document.getElementById('ai-str-' + i);
+        if (el) {
+            el.style.background = i === idx ? '#5a5a5a' : '#444';
+            el.style.fontWeight = i === idx ? 'bold' : 'normal';
+        }
+    }
+    UpdateAIUI();
+}
+
+function SetPersona(idx) {
+    selectedPersona = idx;
+    for (let i = 0; i < 6; i++) {
+        let el = document.getElementById('ai-per-' + i);
+        if (el) {
+            el.style.background = i === idx ? '#5a5a5a' : '#444';
+            el.style.fontWeight = i === idx ? 'bold' : 'normal';
+        }
+    }
+    UpdateAIUI();
+}
+
+function SetModifier(idx) {
+    modifier = idx;
+    for (let i = 0; i < 3; i++) {
+        let el = document.getElementById('ai-mod-' + i);
+        if (el) {
+            el.style.background = i === idx ? '#5a5a5a' : '#444';
+            el.style.fontWeight = i === idx ? 'bold' : 'normal';
+        }
+    }
+    UpdateAIUI();
+}
+
+function UpdateAIUI() {
+    let desc;
+    if (modifier === 0) desc = PERSONAS[selectedPersona].desc;
+    else if (modifier === 1) desc = "Switches sub-persona per position — adapts to what the situation demands";
+    else desc = "Drifting ensemble blend — evaluates from multiple perspectives";
+    let combo = STRENGTHS[strengthLevel].name + ' + ' + PERSONAS[selectedPersona].name + ' + ' + MODIFIER_NAMES[modifier];
+    document.getElementById('ai-diff-desc').textContent = combo + ' — ' + desc;
+}
+
+function StartAIGame() {
+    gameMode = 'ai';
+    InitializeBoard();
+    selRow = selCol = -1;
+    if (strengthLevel === 5) {
+        randomizeAll();
+    }
+    whiteClock = 0;
+    blackClock = 0;
+    ResetClock(true);
+    let sName = strengthLevel === 5 ? 'Random' : STRENGTHS[strengthLevel].name;
+    document.getElementById('screen-play-title').textContent =
+        'Play vs AI (' + sName + ' + ' + PERSONAS[selectedPersona].name + ' + ' + MODIFIER_NAMES[modifier] + ')';
+    gameStatus = "White's turn";
+    ShowScreen('screen-play');
+    RenderBoardHTML('board-wrap', selRow, selCol);
+    document.getElementById('status').textContent = gameStatus;
+    UpdateHistoryDisplay();
+    UpdateClockDisplay();
+    if (!playerSide) {
+        gameStatus = 'AI thinking...';
+        document.getElementById('status').textContent = gameStatus;
+        setTimeout(AIThinkAndMove, 500);
+    }
+}
+
+// ============ CATEGORY SCREEN ============
+function ShowCategory() {
+    lessonIndex = -1;
+    familyFilter = '';
+    ShowScreen('screen-category');
+}
+
+// ============ FAMILY LIST SCREEN ============
+function ShowFamilyList() {
+    lessonIndex = -1;
+    let families = {};
+    for (let i = 0; i < teachingGames.length; i++) {
+        let f = teachingGames[i].family;
+        families[f] = (families[f] || 0) + 1;
+    }
+    let entries = Object.entries(families).sort((a, b) => {
+        if (a[1] !== b[1]) return b[1] - a[1];
+        return a[0].localeCompare(b[0]);
+    });
+    let html = '';
+    for (let [fam, count] of entries) {
+        html += `<div class="lesson-item" data-family="${fam}">${fam} (${count})</div>`;
+    }
+    document.getElementById('family-list-wrap').innerHTML = html;
+    document.querySelectorAll('#family-list-wrap .lesson-item').forEach(el => {
+        el.addEventListener('click', function() {
+            familyFilter = this.dataset.family;
+            ShowFamilyLessons();
+        });
+    });
+    ShowScreen('screen-family');
+}
+
+function ShowFamilyLessons() {
+    let title = familyFilter;
+    document.getElementById('lesson-list-header').innerHTML = `<h2>${title}</h2>`;
+
+    let indices = [];
+    for (let i = 0; i < teachingGames.length; i++)
+        if (teachingGames[i].family === familyFilter)
+            indices.push(i);
+
+    let html = '';
+    for (let j = 0; j < indices.length; j++) {
+        let i = indices[j];
+        html += `<div class="lesson-item" data-idx="${i}">${j + 1}. ${teachingGames[i].name}</div>`;
+    }
+    document.getElementById('lesson-list-wrap').innerHTML = html;
+
+    document.querySelectorAll('#lesson-list-wrap .lesson-item').forEach(el => {
+        el.addEventListener('click', function() {
+            let idx = parseInt(this.dataset.idx);
+            StartLesson(idx);
+        });
+    });
+
+    ShowScreen('screen-lessonlist');
+}
+
+// ============ LESSON LIST SCREEN ============
+function ShowLessonList(filter) {
+    categoryFilter = filter;
+    familyFilter = '';
+    let title = filter === '' ? 'All Lessons' : (filter === 'White' ? 'White Openings' : 'Black Defenses');
+    document.getElementById('lesson-list-header').innerHTML = `<h2>${title}</h2>`;
+
+    let indices = [];
+    for (let i = 0; i < teachingGames.length; i++)
+        if (filter === '' || teachingGames[i].category === filter)
+            indices.push(i);
+
+    const diffOrder = { 'Beginner': 0, 'Intermediate': 1, 'Expert': 2 };
+    const catOrder = { 'White': 0, 'Black': 1 };
+    indices.sort((a, b) => {
+        let da = diffOrder[teachingGames[a].difficulty];
+        if (da === undefined) da = 99;
+        let db = diffOrder[teachingGames[b].difficulty];
+        if (db === undefined) db = 99;
+        if (da !== db) return da - db;
+        let ca = catOrder[teachingGames[a].category];
+        if (ca === undefined) ca = 99;
+        let cb = catOrder[teachingGames[b].category];
+        if (cb === undefined) cb = 99;
+        return ca - cb;
+    });
+
+    let html = '';
+    let currentDiff = '';
+    for (let j = 0; j < indices.length; j++) {
+        let i = indices[j];
+        if (teachingGames[i].difficulty !== currentDiff) {
+            currentDiff = teachingGames[i].difficulty;
+            html += `<div class="diff-header">[${currentDiff}]</div>`;
+        }
+        html += `<div class="lesson-item" data-idx="${i}">${j + 1}. ${teachingGames[i].name}</div>`;
+    }
+    document.getElementById('lesson-list-wrap').innerHTML = html;
+
+    document.querySelectorAll('.lesson-item').forEach(el => {
+        el.addEventListener('click', function() {
+            let idx = parseInt(this.dataset.idx);
+            StartLesson(idx);
+        });
+    });
+
+    ShowScreen('screen-lessonlist');
+}
+
+// ============ LESSON SCREEN ============
+function StartLesson(idx) {
+    lessonIndex = idx;
+    lessonMove = 0;
+    InitializeBoard();
+    whiteTurn = true;
+    ShowScreen('screen-lesson');
+    RenderLesson();
+}
+
+function RenderLesson() {
+    if (lessonIndex < 0 || lessonIndex >= teachingGames.length) return;
+    let game = teachingGames[lessonIndex];
+
+    document.getElementById('lesson-name').textContent = game.name;
+    RenderBoardHTML('board-wrap-lesson', -1, -1);
+
+    let info = '';
+    if (lessonMove === 0) {
+        info = "Ready to begin";
+    } else {
+        let moveNum = Math.floor((lessonMove - 1) / 2) + 1;
+        let m = game.moves[lessonMove - 1];
+        if ((lessonMove - 1) % 2 === 0)
+            info = "Move " + moveNum + ": " + m.from + "-" + m.to;
+        else
+            info = "Move " + moveNum + "... " + m.from + "-" + m.to;
+    }
+    document.getElementById('lesson-info').textContent = info;
+
+    if (lessonMove > 0) {
+        document.getElementById('lesson-comment').textContent = game.moves[lessonMove - 1].comment;
+    } else {
+        document.getElementById('lesson-comment').textContent = game.description;
+    }
+
+    let isEnd = lessonMove >= game.moves.length;
+    let btnHtml = '';
+    btnHtml += '<button class="btn btn-small" id="btn-prev">Previous</button>';
+    btnHtml += '<button class="btn btn-small" id="btn-restart">Restart</button>';
+    if (!isEnd) {
+        btnHtml += '<button class="btn btn-small" id="btn-next">Next</button>';
+    } else {
+        document.getElementById('lesson-comment').textContent = "Lesson complete!";
+        btnHtml += '<button class="btn btn-small" id="btn-next">Back to List</button>';
+    }
+    document.getElementById('lesson-buttons').innerHTML = btnHtml;
+
+    document.getElementById('btn-next').addEventListener('click', function() {
+        if (!isEnd) {
+            MovePiece(game.moves[lessonMove].from, game.moves[lessonMove].to);
+            lessonMove++;
+            RenderLesson();
+        } else {
+            ExitLesson();
+        }
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', function() {
+        if (lessonMove > 0) {
+            UndoMove();
+            lessonMove--;
+            RenderLesson();
+        }
+    });
+
+    document.getElementById('btn-restart').addEventListener('click', function() {
+        StartLesson(lessonIndex);
+    });
+}
+
+function ExitLesson() {
+    lessonIndex = -1;
+    lessonMove = 0;
+    if (familyFilter) {
+        ShowFamilyLessons();
+    } else {
+        ShowLessonList(categoryFilter);
+    }
+}
+
+function LessonListBack() {
+    lessonIndex = -1;
+    if (familyFilter) {
+        ShowFamilyList();
+    } else {
+        ShowCategory();
+    }
+}
+
+// ============ MULTIPLAYER (PeerJS) ============
+let peer = null;
+let conn = null;
+let multiplayerRole = '';
+let isMultiplayer = false;
+
+function ShowMultiplayer() {
+    ShowScreen('screen-multiplayer');
+}
+
+function ShowJoinGame() {
+    document.getElementById('join-status').textContent = '';
+    document.getElementById('join-code-input').value = '';
+    ShowScreen('screen-join');
+}
+
+function HostGame() {
+    if (typeof Peer === 'undefined') {
+        document.getElementById('host-status').textContent = 'PeerJS library failed to load. Check internet connection.';
+        ShowScreen('screen-host');
+        document.getElementById('host-status').textContent = 'PeerJS library failed to load. Check internet connection.';
+        return;
+    }
+    multiplayerRole = 'host';
+    isMultiplayer = true;
+    InitializeBoard();
+    selRow = selCol = -1;
+    whiteClock = 0;
+    blackClock = 0;
+    ResetClock(true);
+    gameStatus = "Waiting for opponent...";
+
+    document.getElementById('host-status').textContent = 'Creating room...';
+    document.getElementById('room-code-wrap').style.display = 'none';
+    ShowScreen('screen-host');
+
+    if (peer) { peer.destroy(); peer = null; }
+    peer = new Peer();
+
+    peer.on('open', function(id) {
+        document.getElementById('host-status').textContent = 'Room ready!';
+        document.getElementById('code-display').textContent = id;
+        document.getElementById('room-code-wrap').style.display = 'block';
+    });
+
+    peer.on('connection', function(c) {
+        conn = c;
+        document.getElementById('host-status').textContent = 'Opponent connected!';
+        conn.on('data', handleRemoteData);
+        conn.on('close', function() {
+            gameStatus = 'Opponent disconnected';
+            if (currentScreen === 'play')
+                document.getElementById('status').textContent = gameStatus;
+        });
+        whiteTurn = true;
+        gameStatus = "White's turn  You are White";
+        ShowScreen('screen-play');
+        RenderBoardHTML('board-wrap', selRow, selCol);
+        document.getElementById('status').textContent = gameStatus;
+        UpdateHistoryDisplay();
+        UpdateClockDisplay();
+    });
+
+    peer.on('error', function(err) {
+        document.getElementById('host-status').textContent = 'Error: ' + err.type;
+    });
+}
+
+function JoinGame() {
+    if (typeof Peer === 'undefined') {
+        document.getElementById('join-status').textContent = 'PeerJS library failed to load. Check internet connection.';
+        return;
+    }
+    multiplayerRole = 'join';
+    isMultiplayer = true;
+    InitializeBoard();
+    selRow = selCol = -1;
+    whiteClock = 0;
+    blackClock = 0;
+    ResetClock(true);
+
+    let hostId = document.getElementById('join-code-input').value.trim();
+    if (!hostId) {
+        document.getElementById('join-status').textContent = 'Please enter a host code';
+        return;
+    }
+
+    document.getElementById('join-status').textContent = 'Connecting...';
+
+    if (peer) { peer.destroy(); peer = null; }
+    peer = new Peer();
+
+    peer.on('open', function() {
+        conn = peer.connect(hostId);
+        conn.on('open', function() {
+            whiteTurn = false;
+            gameStatus = "Connected  You are Black";
+            ShowScreen('screen-play');
+            RenderBoardHTML('board-wrap', selRow, selCol);
+            document.getElementById('status').textContent = gameStatus;
+            UpdateHistoryDisplay();
+            UpdateClockDisplay();
+        });
+        conn.on('data', handleRemoteData);
+        conn.on('close', function() {
+            gameStatus = 'Host disconnected';
+            if (currentScreen === 'play')
+                document.getElementById('status').textContent = gameStatus;
+        });
+        conn.on('error', function() {
+            document.getElementById('join-status').textContent = 'Connection failed. Check the code and try again.';
+        });
+    });
+
+    peer.on('error', function(err) {
+        document.getElementById('join-status').textContent = 'Error: ' + err.type;
+    });
+}
+
+function handleRemoteData(data) {
+    if (data.type === 'move' && MovePiece(data.from, data.to)) {
+        let inCheck = IsInCheck(whiteTurn);
+        gameStatus = whiteTurn ? "White's turn" : "Black's turn";
+        if (inCheck) gameStatus += ' \u2014 Check!';
+        selRow = selCol = -1;
+        RenderBoardHTML('board-wrap', selRow, selCol);
+        document.getElementById('status').textContent = gameStatus;
+        UpdateHistoryDisplay();
+        UpdateClockDisplay();
+    }
+}
+
+function CancelHost() {
+    if (peer) { peer.destroy(); peer = null; }
+    conn = null;
+    isMultiplayer = false;
+    multiplayerRole = '';
+    ShowMultiplayer();
+}
+function CancelJoin() {
+    if (peer) { peer.destroy(); peer = null; }
+    conn = null;
+    isMultiplayer = false;
+    multiplayerRole = '';
+    ShowMultiplayer();
+}
+
+function CopyRoomCode() {
+    let code = document.getElementById('code-display').textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code);
+    } else {
+        let ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(ta);
+    }
+}
+
+// ============ TOURNAMENT UI ============
+let tournSizeSelected = 16;
+
+function ShowTournamentSetup() {
+    ShowScreen('screen-tournament-setup');
+}
+
+function SetTournSize(n) {
+    tournSizeSelected = n;
+    document.querySelectorAll('#screen-tournament-setup .btn').forEach(b => b.style.background = b.style.fontWeight = '');
+    let btns = document.querySelectorAll('#screen-tournament-setup .btn-small');
+    for (let b of btns) {
+        if (parseInt(b.textContent) === n) {
+            b.style.background = '#5a5a5a';
+            b.style.fontWeight = 'bold';
+        }
+    }
+}
+
+function StartTournament() {
+    InitTournament(tournSizeSelected);
+    ShowTournamentBracket();
+}
+
+function ShowTournamentBracket() {
+    if (!tournamentActive) { BackToMenu(); return; }
+    ShowScreen('screen-tournament-bracket');
+
+    let wrap = document.getElementById('tourn-bracket-wrap');
+    let info = document.getElementById('tourn-info');
+    let remaining = tournMatches.filter(m => !m.played && m.p1Idx >= 0 && m.p2Idx >= 0 && m.p1Idx !== tournHumanIdx && m.p2Idx !== tournHumanIdx).length;
+    let pending = GetHumanMatch();
+
+    info.textContent = 'Players: ' + tournamentSize + ' | Matches remaining: ' + remaining + ' AI + ' + (pending ? '1 human' : '0');
+
+    let playBtn = document.getElementById('tourn-play-btn');
+    let resultsBtn = document.getElementById('tourn-results-btn');
+    playBtn.style.display = pending ? 'inline-block' : 'none';
+
+    let allDone = tournMatches.every(m => m.played || m.p1Idx < 0 || m.p2Idx < 0);
+    resultsBtn.style.display = allDone ? 'inline-block' : 'none';
+
+    if (allDone) {
+        info.textContent += ' | Tournament complete!';
+    }
+
+    // Render bracket as list
+    let html = '<div style="display:flex;flex-direction:column;gap:3px;font-size:12px;min-width:600px">';
+    let rounds = [];
+    let current = tournMatches.filter(m => !m.isLoserMatch);
+    for (let r = 0; current.length > 0; r++) {
+        let next = [];
+        let roundHtml = '<div style="border:1px solid #444;padding:4px;margin:2px 0;background:#1a1a1a">';
+        roundHtml += '<b>' + (r === 0 ? 'Round 1 (Winners)' : 'Winners Round ' + (r+1)) + '</b>';
+        for (let m of current) {
+            let p1 = m.p1Idx >= 0 ? tournPlayers[m.p1Idx].name : 'TBD';
+            let p2 = m.p2Idx >= 0 ? tournPlayers[m.p2Idx].name : 'TBD';
+            let w = m.winnerIdx >= 0 ? tournPlayers[m.winnerIdx].name : '?';
+            let status = m.played ? 'Winner: ' + w : (m.p1Idx >= 0 && m.p2Idx >= 0 ? 'Pending' : 'Waiting');
+            let highlight = m.p1Idx === tournHumanIdx || m.p2Idx === tournHumanIdx ? ' style="color:#4caf50;font-weight:bold"' : '';
+            roundHtml += '<div' + highlight + '>' + p1 + ' vs ' + p2 + ' — ' + status + '</div>';
+            if (m.nextMatchId >= 0) next.push(tournMatches[m.nextMatchId]);
+        }
+        roundHtml += '</div>';
+        html += roundHtml;
+        current = next.filter((v,i,a) => a.indexOf(v)===i);
+    }
+
+    // Losers bracket
+    let lbCurrent = tournMatches.filter(m => m.isLoserMatch && !tournMatches.some(m2 => m2.isLoserMatch && m2.nextMatchId === m.id || m2.nextLoserMatchId === m.id));
+    for (let r = 0; lbCurrent.length > 0; r++) {
+        let next = [];
+        let roundHtml = '<div style="border:1px solid #664;padding:4px;margin:2px 0;background:#151515">';
+        roundHtml += '<b>Losers Round ' + (r+1) + '</b>';
+        for (let m of lbCurrent) {
+            if (m.p1Idx < 0 && m.p2Idx < 0) continue;
+            let p1 = m.p1Idx >= 0 ? tournPlayers[m.p1Idx].name : 'TBD';
+            let p2 = m.p2Idx >= 0 ? tournPlayers[m.p2Idx].name : 'TBD';
+            let w = m.winnerIdx >= 0 ? tournPlayers[m.winnerIdx].name : '?';
+            let status = m.played ? 'Winner: ' + w : (m.p1Idx >= 0 && m.p2Idx >= 0 ? 'Pending' : 'Waiting');
+            let highlight = m.p1Idx === tournHumanIdx || m.p2Idx === tournHumanIdx ? ' style="color:#4caf50;font-weight:bold"' : '';
+            roundHtml += '<div' + highlight + '>' + p1 + ' vs ' + p2 + ' — ' + status + '</div>';
+            if (m.nextMatchId >= 0) next.push(tournMatches[m.nextMatchId]);
+            if (m.nextLoserMatchId >= 0) next.push(tournMatches[m.nextLoserMatchId]);
+        }
+        roundHtml += '</div>';
+        html += roundHtml;
+        lbCurrent = next.filter((v,i,a) => a.indexOf(v)===i).filter(m => m && !m.played && m.id);
+    }
+    html += '</div>';
+    wrap.innerHTML = html;
+}
+
+function PlayNextTournamentMatch() {
+    let m = GetHumanMatch();
+    if (!m) { ShowTournamentBracket(); return; }
+    tournCurrentMatch = m.id;
+
+    // Set up the game
+    gameMode = 'ai';
+    if (tournPlayers[m.p1Idx].isHuman) {
+        playerSide = true;
+    } else {
+        playerSide = false;
+    }
+    let aiStrength = m.p1Idx === tournHumanIdx ? tournPlayers[m.p2Idx].strengthIdx : tournPlayers[m.p1Idx].strengthIdx;
+    strengthLevel = aiStrength;
+    selectedPersona = m.p1Idx === tournHumanIdx ? tournPlayers[m.p2Idx].personaIdx : tournPlayers[m.p1Idx].personaIdx;
+    modifier = m.p1Idx === tournHumanIdx ? tournPlayers[m.p2Idx].modifierIdx : tournPlayers[m.p1Idx].modifierIdx;
+
+    InitializeBoard();
+    selRow = selCol = -1;
+    whiteTurn = true;
+    moveCount = 1;
+    moveHistory = [];
+    boardStates = [];
+    enPassantRow = enPassantCol = -1;
+    aiThinking = false;
+    whiteClock = 0;
+    blackClock = 0;
+    ResetClock(true);
+    UpdateClockDisplay();
+
+    let status = 'Tournament match — ' + tournPlayers[m.p1Idx].name + ' vs ' + tournPlayers[m.p2Idx].name;
+    let p1Name = tournPlayers[m.p1Idx].name;
+    let p2Name = tournPlayers[m.p2Idx].name;
+    document.getElementById('screen-play-title').textContent = p1Name + ' vs ' + p2Name;
+    document.getElementById('status').textContent = status;
+    RenderBoardHTML('board-wrap', selRow, selCol);
+    ShowScreen('screen-play');
+
+    if (!playerSide) {
+        setTimeout(function() {
+            AITryMove();
+        }, 500);
+    }
+    UpdateHistoryDisplay();
+}
+
+function ShowTournamentResults() {
+    ShowScreen('screen-tournament-results');
+    let wrap = document.getElementById('tourn-results-wrap');
+
+    // Find final match
+    let final = tournMatches[tournMatches.length - 1];
+    let winner = final.winnerIdx >= 0 ? tournPlayers[final.winnerIdx] : null;
+    let html = '';
+    if (winner) {
+        html += '<div style="font-size:18px;color:#ffd700;margin:8px">Champion: ' + winner.name + '</div>';
+    }
+
+    html += '<table style="border-collapse:collapse;margin:8px auto;font-size:13px">';
+    html += '<tr style="background:#333"><th>Seed</th><th>Player</th><th>W</th><th>L</th></tr>';
+    let sorted = [...tournPlayers].sort((a,b) => a.seed - b.seed);
+    for (let p of sorted) {
+        let w = tournMatches.filter(m => m.winnerIdx === tournPlayers.indexOf(p)).length;
+        let l = tournMatches.filter(m => m.p1Idx === tournPlayers.indexOf(p) || m.p2Idx === tournPlayers.indexOf(p)).filter(m => m.played && m.winnerIdx !== tournPlayers.indexOf(p)).length;
+        let style = p.isHuman ? ' style="color:#4caf50;font-weight:bold"' : '';
+        html += '<tr' + style + '><td>' + p.seed + '</td><td>' + p.name + '</td><td>' + w + '</td><td>' + l + '</td></tr>';
+    }
+    html += '</table>';
+    wrap.innerHTML = html;
+}
+
+// ============ CLOCK ============
+let turnStartTime = 0;
+
+function ResetClock(toWhite) {
+    turnStartTime = performance.now();
+}
+
+function UpdateClockDisplay() {
+    if (typeof whiteClock === 'undefined') return;
+    let wSec = Math.floor((whiteClock || 0) / 1000);
+    let wMin = Math.floor(wSec / 60); wSec %= 60;
+    let bSec = Math.floor((blackClock || 0) / 1000);
+    let bMin = Math.floor(bSec / 60); bSec %= 60;
+    let wDisplay = wMin + ':' + String(wSec).padStart(2,'0');
+    let bDisplay = bMin + ':' + String(bSec).padStart(2,'0');
+    if (whiteTurn) {
+        let e = Math.max(0, performance.now() - (turnStartTime || performance.now()));
+        let es = Math.floor(e / 1000);
+        let em = Math.floor(es / 60); es %= 60;
+        wDisplay += '+' + em + ':' + String(es).padStart(2,'0');
+    } else {
+        let e = Math.max(0, performance.now() - (turnStartTime || performance.now()));
+        let es = Math.floor(e / 1000);
+        let em = Math.floor(es / 60); es %= 60;
+        bDisplay += '+' + em + ':' + String(es).padStart(2,'0');
+    }
+    document.getElementById('clock-display').textContent = '\u25cf ' + wDisplay + '  |  ' + bDisplay + ' \u25cf';
+}
+
+// Update clock display every second during play
+setInterval(function() {
+    if (currentScreen === 'play') UpdateClockDisplay();
+}, 1000);
+
+function UpdateClock(toWhite) {
+    let now = performance.now();
+    let elapsed = now - turnStartTime;
+    if (toWhite) whiteClock += elapsed;
+    else blackClock += elapsed;
+    turnStartTime = now;
+}
+
+// Save tournament when returning from a match
+function BackToMenu() {
+    if (tournamentActive && tournCurrentMatch >= 0) {
+        // Record clock time for the match
+        let m = tournMatches[tournCurrentMatch];
+        if (m) {
+            m.time1 = whiteClock;
+            m.time2 = blackClock;
+            m.played = true;
+
+            // Determine who won this game
+            let humanIdx = tournHumanIdx;
+            let p1IsHuman = m.p1Idx === humanIdx;
+            let p2IsHuman = m.p2Idx === humanIdx;
+            let humanWon = (p1IsHuman && whiteTurn === false) || (p2IsHuman && whiteTurn === true);
+            if (humanWon) tournHumanWins++;
+            else tournHumanLosses++;
+            let loserIdx = m.p1Idx === humanIdx ? m.p2Idx : m.p1Idx;
+            AdvanceTournament(tournCurrentMatch, m.winnerIdx < 0 ? (humanWon ? humanIdx : loserIdx) : m.winnerIdx);
+        }
+        tournCurrentMatch = -1;
+        SaveTournament();
+    }
+    tournCurrentMatch = -1;
+    selRow = selCol = -1;
+    lessonIndex = -1;
+    familyFilter = '';
+    gameMode = 'free';
+    if (isMultiplayer) {
+        if (conn) { conn.close(); conn = null; }
+        if (peer) { peer.destroy(); peer = null; }
+        isMultiplayer = false;
+        multiplayerRole = '';
+    }
+    if (tournamentActive) {
+        ResolveAllAIMatches();
+        SaveTournament();
+        ShowTournamentBracket();
+    } else {
+        ShowScreen('screen-menu');
+    }
+}
+document.addEventListener('keydown', function(e) {
+    if (currentScreen === 'play') {
+        if (e.key === 'Escape') BackToMenu();
+        if ((e.key === 'u' || e.key === 'U') && !isMultiplayer) {
+            UndoLastMove();
+        }
+        if (e.key === 'p' || e.key === 'P') {
+            ExportPGNFromUI();
+        }
+    }
+    if (currentScreen === 'lesson') {
+        if (e.key === 'Escape') ExitLesson();
+        if (e.key === ' ' || e.key === 'Enter') {
+            let btn = document.getElementById('btn-next');
+            if (btn) btn.click();
+        }
+    }
+    if (currentScreen === 'multiplayer' || currentScreen === 'host' || currentScreen === 'join') {
+        if (e.key === 'Escape') BackToMenu();
+    }
+});
+
+// ============ SIZING & ZOOM ============
+let zoom = 1.0;
+
+function applySizing() {
+    let viewW = window.innerWidth;
+    let avail = viewW - 20;
+    let autoSq = Math.floor(avail / 8.4);
+    autoSq = Math.max(30, Math.min(60, autoSq));
+    let sq = Math.round(autoSq * zoom);
+    sq = Math.max(20, Math.min(120, sq));
+    document.documentElement.style.setProperty('--sq', sq + 'px');
+    document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+}
+
+window.addEventListener('load', applySizing);
+window.addEventListener('resize', applySizing);
+
+document.getElementById('zoom-slider').addEventListener('input', function() {
+    zoom = parseFloat(this.value);
+    applySizing();
+});
+
+// ============ INIT ============
+InitializeBoard();
+applySizing();
+</script>
+</body>
+</html>
+
+
+
