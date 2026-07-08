@@ -2207,8 +2207,6 @@ let currentScreen = 'menu';
 let selRow = -1;
 let selCol = -1;
 let gameStatus = '';
-let whiteClock = 0;
-let blackClock = 0;
 let lessonIndex = -1;
 let lessonMove = 0;
 let categoryFilter = '';
@@ -2217,14 +2215,6 @@ let familyFilter = '';
 // ============ AI STATE ============
 let gameMode = 'free'; // 'free' | 'ai' | 'tournament'
 let playerSide = true; // true = human White, false = human Black
-// Game clock (milliseconds)
-let whiteClock = 0, blackClock = 0, lastMoveTimestamp = 0;
-function ResetClock() { whiteClock = 0; blackClock = 0; lastMoveTimestamp = performance.now(); }
-function UpdateClock(toWhite) {
-    let now = performance.now();
-    if (toWhite) whiteClock += now - lastMoveTimestamp; else blackClock += now - lastMoveTimestamp;
-    lastMoveTimestamp = now;
-}
 const PIECE_VALS = { 'P': 100, 'N': 320, 'B': 330, 'R': 500, 'Q': 900, 'K': 20000 };
 
 const STRENGTHS = [
@@ -2262,13 +2252,16 @@ let strengthLevel = 2;     // 0=Novice..4=Grandmaster, 5=Random
 let selectedPersona = 0;   // 0=Novice..5=Attacker
 let modifier = 0;          // 0=Static, 1=Fluid, 2=Fluent
 
-function randomizeAll() {
+function RandomStrengthTier() {
     let r = Math.random() * 100;
-    if (r < 10) strengthLevel = 0;
-    else if (r < 40) strengthLevel = 1;
-    else if (r < 70) strengthLevel = 2;
-    else if (r < 90) strengthLevel = 3;
-    else strengthLevel = 4;
+    if (r < 5) return 0;
+    if (r < 25) return 1;
+    if (r < 75) return 2;
+    if (r < 95) return 3;
+    return 4;
+}
+function randomizeAll() {
+    strengthLevel = RandomStrengthTier();
     selectedPersona = Math.floor(Math.random() * 6);
     modifier = Math.floor(Math.random() * 3);
 }
@@ -2950,12 +2943,10 @@ function InitTournament(n) {
     tournHumanLosses = 0;
 
     for (let i = 0; i < n - 1; i++) {
-        let r = Math.random() * 100;
-        let s = r < 10 ? 0 : r < 40 ? 1 : r < 70 ? 2 : r < 90 ? 3 : 4;
+        let s = RandomStrengthTier();
         tournPlayers.push({ name: 'AI ' + (i + 1), strengthIdx: s, personaIdx: Math.floor(Math.random() * 6), modifierIdx: Math.floor(Math.random() * 3), seed: 0, isHuman: false });
     }
-    let r = Math.random() * 100;
-    let hs = r < 10 ? 0 : r < 40 ? 1 : r < 70 ? 2 : r < 90 ? 3 : 4;
+    let hs = RandomStrengthTier();
     tournPlayers.push({ name: 'You', strengthIdx: hs, personaIdx: 0, modifierIdx: 0, seed: 0, isHuman: true });
 
     tournPlayers.sort((a, b) => {
